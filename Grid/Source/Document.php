@@ -249,6 +249,7 @@ class Document extends Source
 
             if (isset($mapping['fieldName'])) {
                 $values['field'] = $mapping['fieldName'];
+                $values['id'] = $mapping['fieldName'];
             }
 
             if (isset($mapping['id']) && $mapping['id'] == 'id') {
@@ -282,6 +283,20 @@ class Document extends Source
                     $values['type'] = 'date';
                     break;
                 default:
+                    switch ($name) {
+                        case 'country':
+                        case 'countries':
+                            $values['type'] = 'country';
+                            break 2;
+                        case 'language':
+                        case 'languages':
+                            $values['type'] = 'language';
+                            break 2;
+                        case 'locale':
+                        case 'locales':
+                            $values['type'] = 'locale';
+                            break 2;
+                    }
                     $values['type'] = 'text';
             }
 

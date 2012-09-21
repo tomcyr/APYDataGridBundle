@@ -162,32 +162,21 @@ class DataGridExtension extends \Twig_Extension
      */
     public function getGridCell($column, $row, $grid)
     {
-        $values = (array) $row->getField($column->getId());
-        $block = null;
+        $value = $column->renderCell($row->getField($column->getId()), $row, $this->router);
 
-        $return = array();
-        foreach ($values as $sourceValue) {
-            $value = $column->renderCell($sourceValue, $row, $this->router);
+        $id = $this->names[$grid->getHash()];
 
-            $id = $this->names[$grid->getHash()];
-
-            if (($id != '' && ($block !== null
-             || $this->hasBlock($block = 'grid_'.$id.'_column_'.$column->getRenderBlockId().'_cell')
-             || $this->hasBlock($block = 'grid_'.$id.'_column_'.$column->getType().'_cell')
-             || $this->hasBlock($block = 'grid_'.$id.'_column_'.$column->getParentType().'_cell')))
-             || $this->hasBlock($block = 'grid_column_'.$column->getRenderBlockId().'_cell')
-             || $this->hasBlock($block = 'grid_column_'.$column->getType().'_cell')
-             || $this->hasBlock($block = 'grid_column_'.$column->getParentType().'_cell'))
-            {
-                $return[] = $this->renderBlock($block, array('grid' => $grid, 'column' => $column, 'row' => $row, 'value' => $value, 'sourceValue' => $sourceValue));
-            } else {
-                $return[] = $this->renderBlock('grid_column_cell', array('grid' => $grid, 'column' => $column, 'row' => $row, 'value' => $value, 'sourceValue' => $sourceValue));
-                $block = null;
-            }
-
+        if (($id != '' && ($this->hasBlock($block = 'grid_'.$id.'_column_'.$column->getRenderBlockId().'_cell')
+                        || $this->hasBlock($block = 'grid_'.$id.'_column_'.$column->getType().'_cell')
+                        || $this->hasBlock($block = 'grid_'.$id.'_column_'.$column->getParentType().'_cell')))
+         || $this->hasBlock($block = 'grid_column_'.$column->getRenderBlockId().'_cell')
+         || $this->hasBlock($block = 'grid_column_'.$column->getType().'_cell')
+         || $this->hasBlock($block = 'grid_column_'.$column->getParentType().'_cell'))
+        {
+            return $this->renderBlock($block, array('grid' => $grid, 'column' => $column, 'row' => $row, 'value' => $value));
         }
 
-        return implode($column->getSeparator() , $return);
+        return $this->renderBlock('grid_column_cell', array('grid' => $grid, 'column' => $column, 'row' => $row, 'value' => $value));
     }
 
     /**

@@ -66,22 +66,6 @@
                 <source>%count% Results, </source>
                 <target>{0,1}%count% Result, |[2, Inf]%count% Results, </target>
             </trans-unit>
-            <trans-unit id="29">
-                <source>nrlike</source>
-                <target>Doesn't start with</target>
-            </trans-unit>
-            <trans-unit id="30">
-                <source>nllike</source>
-                <target>Doesn't end with</target>
-            </trans-unit>
-            <trans-unit id="31">
-                <source>nbtw</source>
-                <target>Not between exclusive</target>
-            </trans-unit>
-            <trans-unit id="32">
-                <source>nbtwe</source>
-                <target>Not between inclusive</target>
-            </trans-unit>
 
     <!-- with symbols -->
             <!--trans-unit id="26">

@@ -195,7 +195,7 @@ class Entity extends Source
             if (($pos = strpos($fieldName, ':')) !== false) {
                 $fieldName = substr($fieldName, 0, $pos);
             }
-            
+
             return self::TABLE_ALIAS.'.'.$fieldName;
         }
 
@@ -278,7 +278,7 @@ class Entity extends Source
 
                     $q = $this->query->expr()->$operator($this->getFieldName($column, false, $hasHavingClause), "?$bindIndex");
 
-                    if ($filter->getOperator() == Column::OPERATOR_NLIKE) {
+                    if (isset(Column::$virtualNotOperators[$filter->getOperator()])) {
                         $q = $this->query->expr()->not($q);
                     }
 
@@ -405,9 +405,27 @@ class Entity extends Source
             }
 
             switch ($mapping['type']) {
+                case 'array':
+                case 'object':
+                    $values['array'] = true;
                 case 'string':
                 case 'text':
-                    $values['type'] = 'text';
+                    switch ($name) {
+                        case 'country':
+                        case 'countries':
+                            $values['type'] = 'country';
+                            break;
+                        case 'language':
+                        case 'languages':
+                            $values['type'] = 'language';
+                            break;
+                        case 'locale':
+                        case 'locales':
+                            $values['type'] = 'locale';
+                            break;
+                        default:
+                            $values['type'] = 'text';
+                    }
                     break;
                 case 'integer':
                 case 'smallint':
@@ -427,10 +445,6 @@ class Entity extends Source
                     break;
                 case 'time':
                     $values['type'] = 'time';
-                    break;
-                case 'array':
-                case 'object':
-                    $values['type'] = 'array';
                     break;
             }
 

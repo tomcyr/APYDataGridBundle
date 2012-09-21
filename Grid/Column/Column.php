@@ -32,13 +32,25 @@ abstract class Column
     const OPERATOR_GT     = 'gt';
     const OPERATOR_GTE    = 'gte';
     const OPERATOR_BTW    = 'btw';
+    const OPERATOR_NBTW    = 'nbtw';
     const OPERATOR_BTWE   = 'btwe';
+    const OPERATOR_NBTWE    = 'nbtwe';
     const OPERATOR_LIKE   = 'like';
     const OPERATOR_NLIKE  = 'nlike';
     const OPERATOR_RLIKE  = 'rlike';
+    const OPERATOR_NRLIKE  = 'nrlike';
     const OPERATOR_LLIKE  = 'llike';
+    const OPERATOR_NLLIKE  = 'nllike';
     const OPERATOR_ISNULL  = 'isNull';
     const OPERATOR_ISNOTNULL  = 'isNotNull';
+
+    public static $virtualNotOperators = array(
+        self::OPERATOR_NLIKE,
+        self::OPERATOR_NRLIKE,
+        self::OPERATOR_NLLIKE,
+        self::OPERATOR_NBTW,
+        self::OPERATOR_NBTWE,
+    );
 
     /**
      * Align
@@ -85,8 +97,8 @@ abstract class Column
     protected $selectMulti;
     protected $selectExpanded;
     protected $searchOnClick = false;
-
-    protected $dataJunction = self::DATA_CONJUNCTION;
+    protected $separator;
+    protected $dataJunction;
 
 
     /**
@@ -102,44 +114,75 @@ abstract class Column
     public function __initialize(array $params)
     {
         $this->params = $params;
+
+        // Basic
         $this->setId($this->getParam('id'));
-        $this->setTitle($this->getParam('title', ''));
-        $this->setSortable($this->getParam('sortable', true));
-        $this->setVisible($this->getParam('visible', true));
-        $this->setSize($this->getParam('size', -1));
-        $this->setFilterable($this->getParam('filterable', true));
+        $this->setField($this->getParam('field'));
         $this->setVisibleForSource($this->getParam('source', false));
         $this->setPrimary($this->getParam('primary', false));
-        $this->setAlign($this->getParam('align', self::ALIGN_LEFT));
-        $this->setInputType($this->getParam('inputType', 'text'));
-        $this->setField($this->getParam('field'));
-        $this->setRole($this->getParam('role'));
+        $this->setTitle($this->getParam('title', ''));
+
+        // Sort
+        $this->setSortable($this->getParam('sortable', true));
         $this->setOrder($this->getParam('order'));
+
+        // Style
+        $this->setAlign($this->getParam('align', self::ALIGN_LEFT));
+        $this->setSize($this->getParam('size', -1));
+        $this->setInputType($this->getParam('inputType', 'text'));
+        $this->setVisible($this->getParam('visible', true));
+
+        // Security
+        $this->setRole($this->getParam('role'));
+
+        // Filter
+        $this->setFilterable($this->getParam('filterable', true));
         $this->setFilterType($this->getParam('filter', 'input'));
         $this->setSelectFrom($this->getParam('selectFrom', 'query'));
-        $this->setValues($this->getParam('values', array()));
-        $this->setOperatorsVisible($this->getParam('operatorsVisible', true));
-        // Order is important for the order display
-        $this->setOperators($this->getParam('operators', array(
-            self::OPERATOR_EQ,
-            self::OPERATOR_NEQ,
-            self::OPERATOR_LT,
-            self::OPERATOR_LTE,
-            self::OPERATOR_GT,
-            self::OPERATOR_GTE,
-            self::OPERATOR_BTW,
-            self::OPERATOR_BTWE,
-            self::OPERATOR_LIKE,
-            self::OPERATOR_NLIKE,
-            self::OPERATOR_RLIKE,
-            self::OPERATOR_LLIKE,
-            self::OPERATOR_ISNULL,
-            self::OPERATOR_ISNOTNULL,
-        )));
-        $this->setDefaultOperator($this->getParam('defaultOperator', self::OPERATOR_LIKE));
         $this->setSelectMulti($this->getParam('selectMulti', false));
         $this->setSelectExpanded($this->getParam('selectExpanded', false));
+        $this->setValues($this->getParam('values', array()));
+
+        // Filter operator
+        $this->setOperatorsVisible($this->getParam('operatorsVisible', true));
+        // Order is important for the display order
+        if (isset($this->params['array'])) {
+            $this->setOperators($this->getParam('operators', array(
+                self::OPERATOR_LIKE,
+                self::OPERATOR_NLIKE,
+                self::OPERATOR_EQ,
+                self::OPERATOR_NEQ,
+                self::OPERATOR_ISNULL,
+                self::OPERATOR_ISNOTNULL,
+            )));
+        } else {
+            $this->setOperators($this->getParam('operators', array(
+                self::OPERATOR_EQ,
+                self::OPERATOR_NEQ,
+                self::OPERATOR_LT,
+                self::OPERATOR_LTE,
+                self::OPERATOR_GT,
+                self::OPERATOR_GTE,
+                self::OPERATOR_BTW,
+                self::OPERATOR_NBTW,
+                self::OPERATOR_BTWE,
+                self::OPERATOR_NBTWE,
+                self::OPERATOR_LIKE,
+                self::OPERATOR_NLIKE,
+                self::OPERATOR_RLIKE,
+                self::OPERATOR_NRLIKE,
+                self::OPERATOR_LLIKE,
+                self::OPERATOR_NLLIKE,
+                self::OPERATOR_ISNULL,
+                self::OPERATOR_ISNOTNULL,
+            )));
+        }
+
+        $this->setDefaultOperator($this->getParam('defaultOperator', self::OPERATOR_LIKE));
+
+        // Features
         $this->setSearchOnClick($this->getParam('searchOnClick'), false);
+        $this->setSeparator($this->getParam('separator', "<br />"));
     }
 
     protected function getParam($id, $default = null)
@@ -158,13 +201,20 @@ abstract class Column
     public function renderCell($value, $row, $router)
     {
         if (is_callable($this->callback)) {
-            return call_user_func($this->callback, $value, $row, $router);
+            $value = call_user_func($this->callback, $value, $row, $router);
+        } else {
+            $value = $this->getDisplayedValue($value);
         }
 
         if (array_key_exists((string)$value, $this->values)) {
             $value = $this->values[$value];
         }
 
+        return $value;
+    }
+
+    public function getDisplayedValue($value)
+    {
         return $value;
     }
 
@@ -572,49 +622,97 @@ abstract class Column
     public function getFilters($source)
     {
         $filters = array();
+        $operator = $this->data['operator'];
 
-        if ($this->hasOperator($this->data['operator'])) {
-            if ($this instanceof ArrayColumn && in_array($this->data['operator'], array(self::OPERATOR_EQ, self::OPERATOR_NEQ))) {
-                $filters[] = new Filter($this->data['operator'], $this->data['from']);
+        if ($this->hasOperator($operator)) {
+            $valueFrom = $this->data['from'];
+
+            if (isset($this->params['array'])) {
+                $filters = $this->getArrayFilters($operator, (array) $valueFrom, $source);
             } else {
-                switch ($this->data['operator']) {
-                    case self::OPERATOR_BTW:
-                        if ($this->data['from'] != static::DEFAULT_VALUE) {
-                            $filters[] = new Filter(self::OPERATOR_GT, $this->data['from']);
-                        }
-                        if ($this->data['to'] != static::DEFAULT_VALUE) {
-                                $filters[] = new Filter(self::OPERATOR_LT, $this->data['to']);
-                        }
-                        break;
-                    case self::OPERATOR_BTWE:
-                        if ($this->data['from'] != static::DEFAULT_VALUE) {
-                            $filters[] = new Filter(self::OPERATOR_GTE, $this->data['from']);
-                        }
-                        if ($this->data['to'] != static::DEFAULT_VALUE) {
-                            $filters[] = new Filter(self::OPERATOR_LTE, $this->data['to']);
-                        }
-                        break;
-                    case self::OPERATOR_ISNULL:
-                    case self::OPERATOR_ISNOTNULL:
-                        $filters[] = new Filter($this->data['operator']);
-                        break;
-                    case self::OPERATOR_LIKE:
-                    case self::OPERATOR_RLIKE:
-                    case self::OPERATOR_LLIKE:
-                        if ($this->getSelectMulti()) {
-                            $this->setDataJunction(self::DATA_DISJUNCTION);
-                        }
-                    case self::OPERATOR_EQ:
-                    case self::OPERATOR_NEQ:
-                    case self::OPERATOR_NLIKE:
-                        foreach ((array) $this->data['from'] as $value) {
-                            $filters[] = new Filter($this->data['operator'], $value);
-                        }
-                        break;
-                    default:
-                        $filters[] = new Filter($this->data['operator'], $this->data['from']);
-                }
+                $valueTo = $this->data['to'];
+                $filters = $this->getBasicFilters($operator, $valueFrom, $valueTo, $source);
             }
+        }
+
+        if ($this->getSelectMulti() && $this->getDataJunction() !== null) {
+            switch ($operator) {
+                case self::OPERATOR_LIKE:
+                case self::OPERATOR_RLIKE:
+                case self::OPERATOR_LLIKE:
+                    $this->setDataJunction(self::DATA_DISJUNCTION);
+                    break;
+                default:
+                    $this->setDataJunction(self::DATA_CONJUNCTION);
+                    break;
+            }
+        }
+
+        return $filters;
+    }
+
+    protected function getBasicFilters($operator, $valueFrom, $valueTo, $source)
+    {
+        $filters = array();
+        switch ($operator) {
+            case self::OPERATOR_BTW:
+            case self::OPERATOR_NBTW:
+                if ($valueFrom != static::DEFAULT_VALUE) {
+                    $filters[] = new Filter(self::OPERATOR_GT, $valueFrom);
+                }
+                if ($valueTo != static::DEFAULT_VALUE) {
+                    $filters[] = new Filter(self::OPERATOR_LT, $valueTo);
+                }
+                break;
+            case self::OPERATOR_BTWE:
+            case self::OPERATOR_NBTWE:
+                if ($valueFrom != static::DEFAULT_VALUE) {
+                    $filters[] = new Filter(self::OPERATOR_GTE, $valueFrom);
+                }
+                if ($valueTo != static::DEFAULT_VALUE) {
+                    $filters[] = new Filter(self::OPERATOR_LTE, $valueTo);
+                }
+                break;
+            case self::OPERATOR_ISNULL:
+            case self::OPERATOR_ISNOTNULL:
+                $filters[] = new Filter($operator);
+                break;
+            default:
+                $filters[] = new Filter($operator, $valueFrom);
+                break;
+        }
+
+        return $filters;
+    }
+
+    protected function getArrayFilters($operator, array $values, $source)
+    {
+        $filters = array();
+
+        switch ($operator) {
+            case self::OPERATOR_EQ:
+            case self::OPERATOR_NEQ:
+                $filters[] =  new Filter($operator == self::OPERATOR_EQ ? self::OPERATOR_RLIKE : self::OPERATOR_NRLIKE, 'a:'.count($values).':{');
+                $operator = $operator == self::OPERATOR_EQ ? self::OPERATOR_LIKE : self::OPERATOR_NLIKE;
+            case self::OPERATOR_LIKE:
+            case self::OPERATOR_NLIKE:
+                foreach ($values as $value) {
+                    $filters[] =  new Filter($operator, 's:'.strlen($value).':"'.$value.'";');
+                }
+                break;
+            case self::OPERATOR_ISNULL:
+                $filters[] =  new Filter(self::OPERATOR_ISNULL);
+                $filters[] =  new Filter(self::OPERATOR_EQ, 'a:0:{}');
+                $this->setDataJunction(self::DATA_DISJUNCTION);
+                break;
+            case self::OPERATOR_ISNOTNULL:
+                $filters[] =  new Filter(self::OPERATOR_ISNOTNULL);
+                $filters[] =  new Filter(self::OPERATOR_NEQ, 'a:0:{}');
+                break;
+            default:
+                foreach ($values as $value) {
+                    $filters[] = new Filter($operator, $value);
+                }
         }
 
         return $filters;
@@ -747,6 +845,18 @@ abstract class Column
     public function setSelectExpanded($selectExpanded)
     {
         $this->selectExpanded = $selectExpanded;
+    }
+
+    public function setSeparator($separator)
+    {
+        $this->separator = $separator;
+
+        return $this;
+    }
+
+    public function getSeparator()
+    {
+        return $this->separator;
     }
 
     public function hasDQLFunction(&$matches = null)

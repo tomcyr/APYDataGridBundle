@@ -130,7 +130,7 @@ class NumberColumn extends Column
                 throw new TransformationFailedException($formatter->getErrorMessage());
             }
 
-            if (key_exists((string)$value, $this->values)) {
+            if (array_key_exists((string)$value, $this->values)) {
                 $value = $this->values[$value];
             }
 

@@ -93,7 +93,7 @@ class DateTimeColumn extends Column
                 }
             }
 
-            if (key_exists((string)$value, $this->values)) {
+            if (array_key_exists((string)$value, $this->values)) {
                 $value = $this->values[$value];
             }
 

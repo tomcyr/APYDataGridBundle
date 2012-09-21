@@ -11,8 +11,10 @@
         <parameter key="grid.column.datetime.class">APY\DataGridBundle\Grid\Column\DateTimeColumn</parameter>
         <parameter key="grid.column.date.class">APY\DataGridBundle\Grid\Column\DateColumn</parameter>
         <parameter key="grid.column.time.class">APY\DataGridBundle\Grid\Column\TimeColumn</parameter>
-        <parameter key="grid.column.array.class">APY\DataGridBundle\Grid\Column\ArrayColumn</parameter>
         <parameter key="grid.column.blank.class">APY\DataGridBundle\Grid\Column\BlankColumn</parameter>
+        <parameter key="grid.column.country.class">APY\DataGridBundle\Grid\Column\CountryColumn</parameter>
+        <parameter key="grid.column.language.class">APY\DataGridBundle\Grid\Column\LanguageColumn</parameter>
+        <parameter key="grid.column.locale.class">APY\DataGridBundle\Grid\Column\LocaleColumn</parameter>
     </parameters>
 
     <services>
@@ -40,11 +42,19 @@
             <tag name="grid.column.extension" />
         </service>
 
-        <service id="grid.column.array" class="%grid.column.array.class%" public="false">
+        <service id="grid.column.blank" class="%grid.column.blank.class%" public="false">
             <tag name="grid.column.extension" />
         </service>
 
-        <service id="grid.column.blank" class="%grid.column.blank.class%" public="false">
+        <service id="grid.column.country" class="%grid.column.country.class%" public="false">
+            <tag name="grid.column.extension" />
+        </service>
+
+        <service id="grid.column.language" class="%grid.column.language.class%" public="false">
+            <tag name="grid.column.extension" />
+        </service>
+
+        <service id="grid.column.locale" class="%grid.column.locale.class%" public="false">
             <tag name="grid.column.extension" />
         </service>
 
