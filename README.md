@@ -50,3 +50,6 @@ Doesn't start with
 Doesn't end with
 Not between exclusive
 Not between inclusive
+
+## Add a way to set the data junction when you select multiple filters for a column
+Note: The checkbox isn't add yet.
