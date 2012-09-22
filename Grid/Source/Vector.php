@@ -97,6 +97,7 @@ class Vector extends Source
                 if ($fieldValue !== '' && $fieldValue !== null) {
                     if (is_array($fieldValue)) {
                         $fieldTypes['array'] = 1;
+                        // @TODO search the type of each value in the array
                     } elseif (strlen($fieldValue) >= 3 && strtotime($fieldValue) !== false) {
                         $dt = new \DateTime($fieldValue);
                         if ($dt->format('His') === '000000') {
@@ -153,10 +154,7 @@ class Vector extends Source
                     case 'number':
                         $column = new Column\NumberColumn($c->getParams());
                         break;
-                    case 'array':
-                        $column = new Column\ArrayColumn($c->getParams());
-                        break;
-                    case 'text':
+                    // @TODO manage country... columns
                     default:
                         $column = new Column\TextColumn($c->getParams());
                         break;

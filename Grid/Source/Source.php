@@ -289,12 +289,12 @@ abstract class Source implements DriverInterface
                         switch ($operator) {
                             case Column\Column::OPERATOR_EQ:
                                 if ($dataIsNumeric) {
-                                    $found = abs($fieldValue-$value) < 0.00001;
+                                    $found = abs($fieldValue-$value) < 0.000001;
                                     break;
                                 }
                             case Column\Column::OPERATOR_NEQ:
                                 if ($dataIsNumeric) {
-                                    $found = abs($fieldValue-$value) > 0.00001;
+                                    $found = abs($fieldValue-$value) > 0.000001;
                                     break;
                                 }
                             case Column\Column::OPERATOR_LIKE:

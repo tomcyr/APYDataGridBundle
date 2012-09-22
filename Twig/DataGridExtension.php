@@ -49,23 +49,23 @@ class DataGridExtension extends \Twig_Extension
      * @var array
      */
     protected $params = array();
-    
+
     /**
-     * 
+     *
      * @var array
      */
     protected $pagerFantaDefs;
-    
+
     public function __construct($router)
     {
         $this->router = $router;
     }
-    
+
     public function setPagerFanta(array $def)
     {
         $this->pagerFantaDefs=$def;
     }
-    
+
     public function initRuntime(\Twig_Environment $environment)
     {
         $this->environment = $environment;
@@ -150,7 +150,7 @@ class DataGridExtension extends \Twig_Extension
     {
         return $this->renderBlock('grid_pager', array('grid' => $grid, 'pagerfanta' => $this->pagerFantaDefs['enable']));
     }
-    
+
     /**
      * Cell Drawing override
      *
@@ -162,9 +162,12 @@ class DataGridExtension extends \Twig_Extension
      */
     public function getGridCell($column, $row, $grid)
     {
-        $values = (array) $row->getField($column->getId());
-        $block = null;
+        // Cast a datetime won't work.
+        if (!is_array($values = $row->getField($column->getId()))) {
+            $values = array($values);
+        }
 
+        $block = null;
         $return = array();
         foreach ($values as $sourceValue) {
             $value = $column->renderCell($sourceValue, $row, $this->router);

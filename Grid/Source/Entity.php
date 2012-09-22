@@ -488,6 +488,12 @@ class Entity extends Source
                     $value = $row[str_replace('.', '::', $column->getId())];
 
                     switch ($column->getType()) {
+                        case 'datetime':
+                        case 'date':
+                        case 'time':
+                            $displayedValue = $column->getDisplayedValue($value);
+                            $values[$displayedValue] = $displayedValue;
+                            break;
                         case 'array':
                             if (is_string($value)) {
                                 $value = unserialize($value);
@@ -499,14 +505,8 @@ class Entity extends Source
                         case 'number':
                             $values[$value] = $column->getDisplayedValue($value);
                             break;
-                        case 'datetime':
-                        case 'date':
-                        case 'time':
-                            $displayedValue = $column->getDisplayedValue($value);
-                            $values[$displayedValue] = $displayedValue;
-                            break;
                         default:
-                            $values[$value] = $value;
+                            $values[$value] = $column->getDisplayedValue($value);
                     }
                 }
 

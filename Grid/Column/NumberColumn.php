@@ -142,15 +142,19 @@ class NumberColumn extends Column
 
     public function getFilters($source)
     {
-        $parentFilters = parent::getFilters($source);
+        $valueFrom = $this->data['from'];
 
-        $filters = array();
-        foreach($parentFilters as $filter) {
-            // Transforme in number for ODM
-            $filters[] = ($filter->getValue() === null) ? $filter : $filter->setValue($filter->getValue() + 0);
+        if (isset($this->params['array'])) {
+            unset($this->data['from']);
+
+            foreach($valueFrom as $value) {
+                $this->data['from'][] = $value + 0;
+            }
+        } else {
+            $this->data['from'] = $valueFrom + 0;
         }
 
-        return $filters;
+        return parent::getFilters($source);
     }
 
     public function setStyle($style)

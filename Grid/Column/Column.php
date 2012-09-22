@@ -654,6 +654,7 @@ abstract class Column
     protected function getBasicFilters($operator, $valueFrom, $valueTo, $source)
     {
         $filters = array();
+
         switch ($operator) {
             case self::OPERATOR_BTW:
             case self::OPERATOR_NBTW:
@@ -675,8 +676,7 @@ abstract class Column
                 break;
             case self::OPERATOR_ISNULL:
             case self::OPERATOR_ISNOTNULL:
-                $filters[] = new Filter($operator);
-                break;
+                $valueFrom = null;
             default:
                 $filters[] = new Filter($operator, $valueFrom);
                 break;
@@ -690,29 +690,32 @@ abstract class Column
         $filters = array();
 
         switch ($operator) {
-            case self::OPERATOR_EQ:
-            case self::OPERATOR_NEQ:
-                $filters[] =  new Filter($operator == self::OPERATOR_EQ ? self::OPERATOR_RLIKE : self::OPERATOR_NRLIKE, 'a:'.count($values).':{');
-                $operator = $operator == self::OPERATOR_EQ ? self::OPERATOR_LIKE : self::OPERATOR_NLIKE;
-            case self::OPERATOR_LIKE:
-            case self::OPERATOR_NLIKE:
-                foreach ($values as $value) {
-                    $filters[] =  new Filter($operator, 's:'.strlen($value).':"'.$value.'";');
-                }
-                break;
             case self::OPERATOR_ISNULL:
-                $filters[] =  new Filter(self::OPERATOR_ISNULL);
+                $filters[] =  new Filter($operator);
                 $filters[] =  new Filter(self::OPERATOR_EQ, 'a:0:{}');
                 $this->setDataJunction(self::DATA_DISJUNCTION);
                 break;
             case self::OPERATOR_ISNOTNULL:
-                $filters[] =  new Filter(self::OPERATOR_ISNOTNULL);
+                $filters[] =  new Filter($operator);
                 $filters[] =  new Filter(self::OPERATOR_NEQ, 'a:0:{}');
                 break;
-            default:
-                foreach ($values as $value) {
-                    $filters[] = new Filter($operator, $value);
+            case self::OPERATOR_EQ:
+            case self::OPERATOR_NEQ:
+                if ($operator == self::OPERATOR_EQ) {
+                    $filters[] = new Filter(self::OPERATOR_RLIKE, 'a:'.count($values).':{');
+                    $operator = self::OPERATOR_LIKE;
+                } else {
+                    $filters[] = new Filter(self::OPERATOR_NRLIKE, 'a:'.count($values).':{');
+                    $operator = self::OPERATOR_NLIKE;
                 }
+            case self::OPERATOR_LIKE:
+            case self::OPERATOR_NLIKE:
+                foreach ($values as $value) {
+                    $filters[] =  new Filter($operator, serialize($value));
+                }
+                break;
+            default:
+                throw new \Exception($operator . ' operator is not supported for array values.');
         }
 
         return $filters;
