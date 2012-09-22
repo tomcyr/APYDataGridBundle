@@ -1,7 +1,18 @@
+A faire:
+
+Gérer isqueryvalid quand c'est un multi select ?
+Gérer le populate avec array values
+filter avec array values pour autre que text => serialize($fieldValue) ??
+
+Dans vector
+// @TODO search the type of each value in the array
+// @TODO manage country... columns
+
+
 What's new in 2.2 ?
 
 ### Each type of column manage automaticaly array values.
-The bundle detects the array type of the ORM annotation so you just have to define the type of the data of the array. 
+The bundle detects the array type of the ORM annotation so you just have to define the type of the data of the array.
 
 Example:
 
@@ -29,13 +40,13 @@ Example:
      * @ORM\Column(type="string", length=2)
      */
     protected $country;
-    
+
     /*
      * Automatic country column with array value support
      * @ORM\Column(type="array")
      */
     protected $countries;
-    
+
     /*
      * Forced country column
      * @ORM\Column(type="string", length=2)
