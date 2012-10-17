@@ -97,6 +97,7 @@ abstract class Column
     protected $selectMulti;
     protected $selectExpanded;
     protected $searchOnClick = false;
+    protected $safe;
     protected $separator;
     protected $dataJunction;
 
@@ -181,7 +182,8 @@ abstract class Column
         $this->setDefaultOperator($this->getParam('defaultOperator', self::OPERATOR_LIKE));
 
         // Features
-        $this->setSearchOnClick($this->getParam('searchOnClick'), false);
+        $this->setSearchOnClick($this->getParam('searchOnClick', false));
+        $this->setSafe($this->getParam('safe', 'html'));
         $this->setSeparator($this->getParam('separator', "<br />"));
     }
 
@@ -912,5 +914,25 @@ abstract class Column
     public function getSearchOnClick()
     {
         return $this->searchOnClick;
+    }
+
+    /**
+     * Allows to set twig escaping parameter (html, js, css, url, html_attr)
+     * or to display raw value if type is false
+     * 
+     * @param type $safeOption can be one of raw, html, js, css, url, html_attr
+     *
+     * @return \APY\DataGridBundle\Grid\Column\Column
+     */
+    public function setSafe($safeOption)
+    {
+        $this->safe = $safeOption;
+
+        return $this;
+    }
+
+    public function getSafe()
+    {
+        return $this->safe;
     }
 }
