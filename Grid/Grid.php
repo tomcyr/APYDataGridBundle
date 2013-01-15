@@ -560,7 +560,7 @@ class Grid
         //add row actions column
         if (count($this->rowActions) > 0) {
             foreach ($this->rowActions as $column => $rowActions) {
-                if ($actionColumn = $this->columns->hasColumnById($column, true)) {
+                if (($actionColumn = $this->columns->hasColumnById($column, true))) {
                     $actionColumn->setRowActions($rowActions);
                 } else {
                     $actionColumn = new ActionsColumn($column, 'Actions', $rowActions);
@@ -1021,7 +1021,7 @@ class Grid
                 $value = array('from' => $ColumnValue);
             }
 
-            if (is_bool($value['from'])) {
+            if (isset($value['from']) && is_bool($value['from'])) {
                 $value['from'] = $value['from'] ? '1' : '0';
             }
 

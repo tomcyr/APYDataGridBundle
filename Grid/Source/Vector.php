@@ -126,7 +126,23 @@ class Vector extends Source
             } elseif (isset($fieldTypes['date']) && isset($fieldTypes['datetime'])) {
                 $c->setType('datetime');
             } else {
-                $c->setType('text');
+                switch ($c->getId()) {
+                    case 'country':
+                    case 'countries':
+                        $type = 'country';
+                        break;
+                    case 'language':
+                    case 'languages':
+                        $type = 'language';
+                        break;
+                    case 'locale':
+                    case 'locales':
+                        $type = 'locale';
+                        break;
+                    default:
+                        $type = 'text';
+                }
+                $c->setType($type);
             }
         }
     }
@@ -154,7 +170,15 @@ class Vector extends Source
                     case 'number':
                         $column = new Column\NumberColumn($c->getParams());
                         break;
-                    // @TODO manage country... columns
+                    case 'country':
+                        $column = new Column\CountryColumn($c->getParams());
+                        break;
+                    case 'language':
+                        $column = new Column\LanguageColumn($c->getParams());
+                        break;
+                    case 'locale':
+                        $column = new Column\LocaleColumn($c->getParams());
+                        break;
                     default:
                         $column = new Column\TextColumn($c->getParams());
                         break;

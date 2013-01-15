@@ -627,33 +627,33 @@ abstract class Column
         $operator = $this->data['operator'];
 
         if ($this->hasOperator($operator)) {
-            $valueFrom = $this->data['from'];
+            $valueFrom = (array) $this->data['from'];
 
             if (isset($this->params['array'])) {
-                $filters = $this->getArrayFilters($operator, (array) $valueFrom, $source);
+                $filters = $this->getArrayFilters($operator, $valueFrom, $source);
             } else {
-                $valueTo = $this->data['to'];
+                $valueTo = (array) $this->data['to'];
                 $filters = $this->getBasicFilters($operator, $valueFrom, $valueTo, $source);
             }
-        }
 
-        if ($this->getSelectMulti() && $this->getDataJunction() !== null) {
-            switch ($operator) {
-                case self::OPERATOR_LIKE:
-                case self::OPERATOR_RLIKE:
-                case self::OPERATOR_LLIKE:
-                    $this->setDataJunction(self::DATA_DISJUNCTION);
-                    break;
-                default:
-                    $this->setDataJunction(self::DATA_CONJUNCTION);
-                    break;
+            if ($this->getSelectMulti() && $this->getDataJunction() !== null) {
+                switch ($operator) {
+                    case self::OPERATOR_LIKE:
+                    case self::OPERATOR_RLIKE:
+                    case self::OPERATOR_LLIKE:
+                        $this->setDataJunction(self::DATA_DISJUNCTION);
+                        break;
+                    default:
+                        $this->setDataJunction(self::DATA_CONJUNCTION);
+                        break;
+                }
             }
         }
 
         return $filters;
     }
 
-    protected function getBasicFilters($operator, $valueFrom, $valueTo, $source)
+    protected function getBasicFilters($operator, array $valueFrom, array $valueTo, $source)
     {
         $filters = array();
 
@@ -661,26 +661,28 @@ abstract class Column
             case self::OPERATOR_BTW:
             case self::OPERATOR_NBTW:
                 if ($valueFrom != static::DEFAULT_VALUE) {
-                    $filters[] = new Filter(self::OPERATOR_GT, $valueFrom);
+                    $filters[] = new Filter(self::OPERATOR_GT, $valueFrom[0]);
                 }
                 if ($valueTo != static::DEFAULT_VALUE) {
-                    $filters[] = new Filter(self::OPERATOR_LT, $valueTo);
+                    $filters[] = new Filter(self::OPERATOR_LT, $valueTo[0]);
                 }
                 break;
             case self::OPERATOR_BTWE:
             case self::OPERATOR_NBTWE:
                 if ($valueFrom != static::DEFAULT_VALUE) {
-                    $filters[] = new Filter(self::OPERATOR_GTE, $valueFrom);
+                    $filters[] = new Filter(self::OPERATOR_GTE, $valueFrom[0]);
                 }
                 if ($valueTo != static::DEFAULT_VALUE) {
-                    $filters[] = new Filter(self::OPERATOR_LTE, $valueTo);
+                    $filters[] = new Filter(self::OPERATOR_LTE, $valueTo[0]);
                 }
                 break;
             case self::OPERATOR_ISNULL:
             case self::OPERATOR_ISNOTNULL:
                 $valueFrom = null;
             default:
-                $filters[] = new Filter($operator, $valueFrom);
+                foreach ((array) $valueFrom as $value) {
+                    $filters[] =  new Filter($operator, $value);
+                }
                 break;
         }
 
@@ -919,7 +921,7 @@ abstract class Column
     /**
      * Allows to set twig escaping parameter (html, js, css, url, html_attr)
      * or to display raw value if type is false
-     * 
+     *
      * @param type $safeOption can be one of raw, html, js, css, url, html_attr
      *
      * @return \APY\DataGridBundle\Grid\Column\Column

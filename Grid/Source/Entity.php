@@ -219,7 +219,9 @@ class Entity extends Source
             case Column::OPERATOR_LIKE:
             case Column::OPERATOR_LLIKE:
             case Column::OPERATOR_RLIKE:
-            case Column::OPERATOR_NLIKE: return 'like';
+            case Column::OPERATOR_NLIKE:
+            case Column::OPERATOR_NLLIKE:
+            case Column::OPERATOR_NRLIKE: return 'like';
             default: return $operator;
         }
     }
@@ -230,8 +232,10 @@ class Entity extends Source
             //case Column::OPERATOR_REGEXP:
             case Column::OPERATOR_LIKE:
             case Column::OPERATOR_NLIKE: return "%$value%";
-            case Column::OPERATOR_LLIKE: return "%$value";
-            case Column::OPERATOR_RLIKE: return "$value%";
+            case Column::OPERATOR_LLIKE:
+            case Column::OPERATOR_NLLIKE: return "%$value";
+            case Column::OPERATOR_RLIKE:
+            case Column::OPERATOR_NRLIKE: return "$value%";
             default: return $value;
         }
     }
@@ -277,7 +281,7 @@ class Entity extends Source
 
                     $q = $this->query->expr()->$operator($this->getFieldName($column, false, $hasHavingClause), "?$bindIndex");
 
-                    if (isset(Column::$virtualNotOperators[$filter->getOperator()])) {
+                    if (in_array($filter->getOperator(), Column::$virtualNotOperators)) {
                         $q = $this->query->expr()->not($q);
                     }
 
@@ -295,6 +299,7 @@ class Entity extends Source
                 }
             }
 
+            // Encore utile ?
             if ($column->getType() === 'array') {
                 $serializeColumns[] = $column->getId();
             }
@@ -335,7 +340,7 @@ class Entity extends Source
 
         //call overridden prepareQuery or associated closure
         $this->prepareQuery($this->query);
-
+        //error_log('#YPT ' . __METHOD__ . '[L.' . __LINE__ . '] $this->query->getDQL(): ' . var_export($this->query->getDQL(), true));
         $items = $this->query->getQuery()->getResult();
 
         // hydrate result
@@ -493,19 +498,13 @@ class Entity extends Source
                             $displayedValue = $column->getDisplayedValue($value);
                             $values[$displayedValue] = $displayedValue;
                             break;
-                        case 'array':
-                            if (is_string($value)) {
-                                $value = unserialize($value);
-                            }
-                            foreach ($value as $val) {
-                                $values[$val] = $val;
-                            }
-                            break;
                         case 'number':
                             $values[$value] = $column->getDisplayedValue($value);
                             break;
                         default:
-                            $values[$value] = $column->getDisplayedValue($value);
+                            foreach ((array) $value as $val) {
+                                $values[$val] = $column->getDisplayedValue($val);
+                            }
                     }
                 }
 
@@ -549,5 +548,9 @@ class Entity extends Source
     public function getHash()
     {
         return $this->entityName;
+    }
+
+    public function getQuery() {
+        return $this->query;
     }
 }
