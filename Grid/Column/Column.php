@@ -636,7 +636,7 @@ abstract class Column
                 $filters = $this->getBasicFilters($operator, $valueFrom, $valueTo, $source);
             }
 
-            if ($this->getSelectMulti() && $this->getDataJunction() !== null) {
+            if ($this->getSelectMulti() && $this->getDataJunction() === null) {
                 switch ($operator) {
                     case self::OPERATOR_LIKE:
                     case self::OPERATOR_RLIKE:
