@@ -550,7 +550,8 @@ class Entity extends Source
         return $this->entityName;
     }
 
-    public function getQuery() {
+    public function getQuery()
+    {
         return $this->query;
     }
 }

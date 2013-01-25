@@ -99,7 +99,7 @@ abstract class Column
     protected $searchOnClick = false;
     protected $safe;
     protected $separator;
-    protected $dataJunction;
+    protected $dataJunction = null;
 
 
     /**
@@ -621,6 +621,11 @@ abstract class Column
         return $this->filterType;
     }
 
+    public function isArrayColumn()
+    {
+        return isset($this->params['array']);
+    }
+
     public function getFilters($source)
     {
         $filters = array();
@@ -628,8 +633,7 @@ abstract class Column
 
         if ($this->hasOperator($operator)) {
             $valueFrom = (array) $this->data['from'];
-
-            if (isset($this->params['array'])) {
+            if ($this->isArrayColumn()) {
                 $filters = $this->getArrayFilters($operator, $valueFrom, $source);
             } else {
                 $valueTo = (array) $this->data['to'];

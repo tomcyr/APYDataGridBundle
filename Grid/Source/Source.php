@@ -234,7 +234,6 @@ abstract class Source implements DriverInterface
         // Populate from data
         $items = $this->getItemsFromData($columns);
         $serializeColumns = array();
-
         foreach ($this->data as $key => $item) {
             $keep = true;
 
@@ -242,6 +241,10 @@ abstract class Source implements DriverInterface
                 $fieldName = $column->getField();
                 $fieldValue = $items[$key][$fieldName];
                 $dataIsNumeric = ($column->getType() == 'number' || $column->getType() == 'boolean');
+
+                if ($column->isArrayColumn()) {
+                    $serializeColumns[] = $column->getId();
+                }
 
                 // Filter
                 if ($column->isFiltered()) {
@@ -258,6 +261,7 @@ abstract class Source implements DriverInterface
 
                     $found = false;
                     foreach ($filters as $filter) {
+
                         $operator = $filter->getOperator();
                         $value = $filter->getValue();
 
@@ -301,11 +305,12 @@ abstract class Source implements DriverInterface
                             case Column\Column::OPERATOR_NLIKE:
                             case Column\Column::OPERATOR_LLIKE:
                             case Column\Column::OPERATOR_RLIKE:
-                                if ($column->getType() === 'array') {
-                                    $fieldValue = str_replace(':{i:0;', ':{', serialize($fieldValue));
+                                $fieldValueTemp = $fieldValue;
+                                if ($column->isArrayColumn()) {
+                                    $fieldValueTemp = str_replace(':{i:0;', ':{', serialize($fieldValue));
                                 }
 
-                                $found = preg_match($value, $fieldValue);
+                                $found = preg_match($value, $fieldValueTemp);
                                 break;
                             case Column\Column::OPERATOR_GT:
                                 $found = $fieldValue > $value;
@@ -330,26 +335,22 @@ abstract class Source implements DriverInterface
                         // AND
                         if (!$found && !$disjunction) {
                             $keep = false;
-                            break 2;
+                            break;
                         }
 
                         // OR
                         if ($found && $disjunction) {
                             $keep = true;
-                            break 2;
+                            break;
                         }
                     }
-                }
 
-                if ($column->getType() === 'array') {
-                    $serializeColumns[] = $column->getId();
+                    if (!$keep) {
+                        unset($items[$key]);
+                        break;
+                    }
                 }
             }
-
-            if (!$keep) {
-                unset($items[$key]);
-            }
-
         }
 
         // Order
