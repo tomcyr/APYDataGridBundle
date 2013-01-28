@@ -32,6 +32,7 @@ class Grid
     const REQUEST_QUERY_MASS_ACTION_ALL_KEYS_SELECTED = '__action_all_keys';
     const REQUEST_QUERY_MASS_ACTION = '__action_id';
     const REQUEST_QUERY_EXPORT = '__export_id';
+    const REQUEST_QUERY_TWEAK = '__tweak_id';
     const REQUEST_QUERY_PAGE = '_page';
     const REQUEST_QUERY_LIMIT = '_limit';
     const REQUEST_QUERY_ORDER = '_order';
@@ -211,6 +212,13 @@ class Grid
     protected $dataJunction = Column::DATA_CONJUNCTION;
 
     /**
+     * Permanent filters
+     *
+     * @var array
+     */
+    protected $permanentFilters = array();
+
+    /**
      * Default filters
      *
      * @var array
@@ -237,6 +245,13 @@ class Grid
      * @var int
      */
     protected $defaultPage;
+
+    /**
+     * Tweaks
+     * 
+     * @var array
+     */
+    protected $tweaks = array();
 
     // Lazy parameters
     protected $lazyAddColumn = array();
@@ -266,7 +281,7 @@ class Grid
         $this->columns = new Columns($this->securityContext);
 
         $this->routeParameters = $this->request->attributes->all();
-        foreach ($this->routeParameters as $key => $param) {
+        foreach (array_keys($this->routeParameters) as $key) {
             if (substr($key, 0, 1) == '_') {
                 unset($this->routeParameters[$key]);
             }
@@ -323,13 +338,7 @@ class Grid
 
         // isReadyForRedirect ?
         if (!empty($this->requestData)) {
-            $this->executeMassActions();
-
-            if (!$this->executeExports()) {
-                $this->processRequestData();
-
-                $this->saveSession();
-            }
+            $this->processRequestData();
 
             $this->redirect = true;
         }
@@ -337,9 +346,9 @@ class Grid
         if ($this->redirect === null || ($this->request->isXmlHttpRequest() && !$this->isReadyForExport)) {
             if ($this->newSession) {
                 $this->setDefaultSessionData();
-
-                $this->saveSession();
             }
+
+            $this->processPermanentFilters();
 
             //Configures the grid with the data read from the session.
             $this->processSessionData();
@@ -350,6 +359,11 @@ class Grid
         }
 
         return $this->redirect;
+    }
+
+    protected function getCurrentUri()
+    {
+        return $this->request->getScheme().'://'.$this->request->getHttpHost().$this->request->getBaseUrl().$this->request->getPathInfo();
     }
 
     protected function processPersistence()
@@ -365,11 +379,6 @@ class Grid
         if ($this->session->get($this->hash) === null) {
             $this->newSession = true;
         }
-    }
-
-    protected function getCurrentUri()
-    {
-        return $this->request->getScheme().'://'.$this->request->getHttpHost().$this->request->getBaseUrl().$this->request->getPathInfo();
     }
 
     protected function processLazyParameters()
@@ -407,7 +416,144 @@ class Grid
      */
     protected function processRequestData()
     {
-        // Filters
+        $this->processMassActions($this->getFromRequest(self::REQUEST_QUERY_MASS_ACTION));
+
+        if ($this->processExports($this->getFromRequest(Grid::REQUEST_QUERY_EXPORT))
+            || $this->processTweaks()) {
+            return;
+        }
+
+        $filtering = $this->processRequestFilters();
+
+        $this->processPage($this->getFromRequest(self::REQUEST_QUERY_PAGE), $filtering);
+
+        $this->processOrder($this->getFromRequest(self::REQUEST_QUERY_ORDER));
+
+        $this->processLimit($this->getFromRequest(self::REQUEST_QUERY_LIMIT));
+
+        $this->saveSession();
+    }
+
+    /**
+     * Process mass actions
+     *
+     * @throws \RuntimeException
+     * @throws \OutOfBoundsException
+     */
+    protected function processMassActions($actionId)
+    {
+        if ($actionId > -1) {
+            if (array_key_exists($actionId, $this->massActions)) {
+                $action = $this->massActions[$actionId];
+                $actionAllKeys = (boolean)$this->getFromRequest(self::REQUEST_QUERY_MASS_ACTION_ALL_KEYS_SELECTED);
+                $actionKeys = $actionAllKeys == false ? (array) $this->getFromRequest(MassActionColumn::ID) : array();
+
+                if($actionAllKeys)
+                {
+                    $this->processSessionData();
+                    $this->page = 0;
+                    $this->limit = 0;
+                    $this->prepare();
+                }
+
+                if (is_callable($action->getCallback())) {
+                    call_user_func($action->getCallback(), array_keys($actionKeys), $actionAllKeys, $this->session, $action->getParameters());
+                } elseif (strpos($action->getCallback(), ':') !== false) {
+                    $this->container->get('http_kernel')->forward($action->getCallback(), array_merge(array('primaryKeys' => array_keys($actionKeys), 'allPrimaryKeys' => $actionAllKeys), $action->getParameters()));
+                } else {
+                    throw new \RuntimeException(sprintf('Callback %s is not callable or Controller action', $action->getCallback()));
+                }
+            } else {
+                throw new \OutOfBoundsException(sprintf('Action %s is not defined.', $actionId));
+            }
+        }
+    }
+
+    /**
+     * Process exports
+     *
+     * @return boolean
+     *
+     * @throws \OutOfBoundsException
+     */
+    protected function processExports($exportId)
+    {
+        if ($exportId > -1) {
+            if (array_key_exists($exportId, $this->exports)) {
+                $this->isReadyForExport = true;
+
+                $this->processSessionData();
+                $this->page = 0;
+                $this->limit = 0;
+                $this->prepare();
+
+                $export = $this->exports[$exportId];
+                if ($export instanceof ContainerAwareInterface) {
+                    $export->setContainer($this->container);
+                }
+                $export->computeData($this);
+
+                $this->exportResponse = $export->getResponse();
+
+                return true;
+            } else {
+                throw new \OutOfBoundsException(sprintf('Export %s is not defined.', $exportId));
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     *
+     * @throws \OutOfBoundsException
+     */
+    protected function processTweaks()
+    {
+        $tweakId = $this->getFromRequest(self::REQUEST_QUERY_TWEAK);
+
+        if ($tweakId > -1) {
+            if (array_key_exists($tweakId, $this->tweaks)) {
+                $tweak = $this->tweaks[$tweakId];
+
+                if (isset($tweak['filters'])) {
+                    $this->setDefaultFilters($tweak['filters']);
+                    $this->processDefaultFilters();
+                }
+
+                if (isset($tweak['order'])) {
+                    $this->processOrder($tweak['order']);
+                }
+
+                if (isset($tweak['massAction'])) {
+                    $this->processMassActions($tweak['massAction']);
+                }
+
+                if (isset($tweak['page'])) {
+                    $this->processPage($tweak['page']);
+                }
+
+                if (isset($tweak['limit'])) {
+                    $this->processLimit($tweak['limit']);
+                }
+
+                if (isset($tweak['export'])) {
+                    $this->processExports($tweak['export']);
+                }
+
+                $this->saveSession();
+
+                return true;
+            } else {
+                throw new \OutOfBoundsException(sprintf('Tweak %s is not defined.', $tweakId));
+            }
+        }
+
+        return false;
+    }
+
+    protected function processRequestFilters()
+    {
         $filtering = false;
         foreach ($this->columns as $column)
         {
@@ -421,13 +567,17 @@ class Grid
                 $this->set($ColumnId, $data);
 
                 // Filtering ?
-                if ($data !== null) {
+                if (!$filtering && $data !== null) {
                     $filtering = true;
                 }
             }
         }
 
-        // Page
+        return $filtering;
+    }
+
+    protected function processPage($page, $filtering = false)
+    {
         // Set to the first page if this is a request of order, limit, mass action or filtering
         if ($this->getFromRequest(self::REQUEST_QUERY_ORDER) !== null
          || $this->getFromRequest(self::REQUEST_QUERY_LIMIT) !== null
@@ -435,11 +585,13 @@ class Grid
          || $filtering) {
             $this->set(self::REQUEST_QUERY_PAGE, 0);
         } else {
-            $this->set(self::REQUEST_QUERY_PAGE, $this->getFromRequest(self::REQUEST_QUERY_PAGE));
+            $this->set(self::REQUEST_QUERY_PAGE, $page);
         }
+    }
 
-        // Order
-        if (($order = $this->getFromRequest(self::REQUEST_QUERY_ORDER)) !== null) {
+    protected function processOrder($order)
+    {
+        if ($order !== null) {
             list($columnId, $columnOrder) = explode('|', $order);
 
             $column = $this->columns->getColumnById($columnId);
@@ -447,9 +599,10 @@ class Grid
                 $this->set(self::REQUEST_QUERY_ORDER, $order);
             }
         }
+    }
 
-        // Limit
-        $limit = $this->getFromRequest(self::REQUEST_QUERY_LIMIT);
+    protected function processLimit($limit)
+    {
         if (isset($this->limits[$limit])) {
             $this->set(self::REQUEST_QUERY_LIMIT, $limit);
         }
@@ -458,10 +611,7 @@ class Grid
     protected function setDefaultSessionData()
     {
         // Default filters
-        foreach($this->defaultFilters as $columnId => $value) {
-            $this->columns->getColumnById($columnId);
-            $this->set($columnId, $value);
-        }
+        $this->processDefaultFilters();
 
         // Default page
         if ($this->defaultPage !== null) {
@@ -476,7 +626,7 @@ class Grid
         if ($this->defaultOrder !== null) {
             list($columnId, $columnOrder) = explode('|', $this->defaultOrder);
 
-            $column = $this->columns->getColumnById($columnId);
+            $this->columns->getColumnById($columnId);
             if (in_array(strtolower($columnOrder), array('asc', 'desc'))) {
                 $this->set(self::REQUEST_QUERY_ORDER, $this->defaultOrder);
             } else {
@@ -495,6 +645,38 @@ class Grid
                 throw new \InvalidArgumentException('Limit must be a positive number');
             }
         }
+
+        $this->saveSession();
+    }
+
+     /**
+     * Store permanent filters to the session and disable the filter capability for the column if there are permanent filters
+     */
+    protected function processFilters($permanent = true)
+    {
+        foreach(($permanent ? $this->permanentFilters : $this->defaultFilters) as $columnId => $value) {
+            /* @var $column Column */
+            $column = $this->columns->getColumnById($columnId);
+
+            if ($permanent) {
+                // Disable the filter capability for the column
+                $column->setFilterable(false);
+            }
+
+            // Store in the session
+            $this->set($columnId, $value);
+        }
+    }
+
+    protected function processPermanentFilters()
+    {
+        $this->processFilters();
+        $this->saveSession();
+    }
+
+    protected function processDefaultFilters()
+    {
+        $this->processFilters(false);
     }
 
     /**
@@ -617,72 +799,6 @@ class Grid
         }
 
         return $this;
-    }
-
-    /**
-     * Execute mass actions
-     *
-     * @throws \RuntimeException
-     * @throws \OutOfBoundsException
-     */
-    protected function executeMassActions()
-    {
-        $actionId = $this->getFromRequest(self::REQUEST_QUERY_MASS_ACTION);
-
-        if ($actionId > -1) {
-            if (array_key_exists($actionId, $this->massActions)) {
-                $action = $this->massActions[$actionId];
-                $actionAllKeys = (boolean)$this->getFromRequest(self::REQUEST_QUERY_MASS_ACTION_ALL_KEYS_SELECTED);
-                $actionKeys = $actionAllKeys == false ? (array) $this->getFromRequest(MassActionColumn::ID) : array();
-
-                if (is_callable($action->getCallback())) {
-                    call_user_func($action->getCallback(), array_keys($actionKeys), $actionAllKeys, $this->session, $action->getParameters());
-                } elseif (strpos($action->getCallback(), ':') !== false) {
-                    $this->container->get('http_kernel')->forward($action->getCallback(), array_merge(array('primaryKeys' => array_keys($actionKeys), 'allPrimaryKeys' => $actionAllKeys), $action->getParameters()));
-                } else {
-                    throw new \RuntimeException(sprintf('Callback %s is not callable or Controller action', $action->getCallback()));
-                }
-            } else {
-                throw new \OutOfBoundsException(sprintf('Action %s is not defined.', $actionId));
-            }
-        }
-    }
-
-    /**
-     * Execute exports
-     *
-     * @return boolean
-     *
-     * @throws \OutOfBoundsException
-     */
-    protected function executeExports()
-    {
-        $exportId = $this->getFromRequest(Grid::REQUEST_QUERY_EXPORT);
-
-        if ($exportId > -1) {
-            if (array_key_exists($exportId, $this->exports)) {
-                $this->isReadyForExport = true;
-
-                $this->processSessionData();
-                $this->page = 0;
-                $this->limit = 0;
-                $this->prepare();
-
-                $export = $this->exports[$exportId];
-                if ($export instanceof ContainerAwareInterface) {
-                    $export->setContainer($this->container);
-                }
-                $export->computeData($this);
-
-                $this->exportResponse = $export->getResponse();
-
-                return true;
-            } else {
-                throw new \OutOfBoundsException(sprintf('Export %s is not defined.', $exportId));
-            }
-        }
-
-        return false;
     }
 
     /**
@@ -848,6 +964,82 @@ class Grid
     }
 
     /**
+     * Add a tweak
+     * @param string title title of the tweak
+     * @param array $tweak array('filters' => array, 'order' => 'colomunId|order', 'page' => integer, 'limit' => integer)Hash of columnName => initValue
+     * @param string id id of the tweak
+     * @param string group group of the tweak
+     *
+     * @return self
+     */
+    public function addTweak($title, array $tweak, $id = null, $group = null)
+    {
+        if ($id !== null && !preg_match('/^[0-9a-zA-Z_\+-]+$/', $id)) {
+            throw new \InvalidArgumentException(sprintf('Tweak id "%s" is malformed. The id have to match this regex ^[0-9a-zA-Z_\+-]+', $id));
+        }
+
+        $tweak = array_merge(array('id' => $id, 'title' => $title, 'group' => $group), $tweak);
+        if (isset($id)) {
+            $this->tweaks[$id] = $tweak;
+        } else {
+            $this->tweaks[] = $tweak;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Returns tweaks
+     * Add the url of the tweak
+     *
+     * @return array
+     */
+    public function getTweaks()
+    {
+        $separator =  strpos($this->getRouteUrl(), '?') ? '&' : '?';
+        $url = $this->getRouteUrl().$separator.$this->getHash().'['.Grid::REQUEST_QUERY_TWEAK.']=';
+
+        foreach($this->tweaks as $id => $tweak) {
+            $this->tweaks[$id] = array_merge($tweak, array('url' => $url.$id));
+        }
+
+        return $this->tweaks;
+    }
+
+    /**
+     * Returns a tweak
+     *
+     * @return array
+     */
+    public function getTweak($id)
+    {
+        $tweaks = $this->getTweaks();
+        if (isset($tweaks[$id])) {
+            return $tweaks[$id];
+        }
+
+        throw new \InvalidArgumentException(sprintf('Tweak with id "%s" doesn\'t exists', $id));
+    }
+
+    /**
+     * Returns tweaks with a specific group
+     *
+     * @return array
+     */
+    public function getTweaksGroup($group)
+    {
+        $tweaksGroup = $this->getTweaks();;
+
+        foreach($tweaksGroup as $id => $tweak) {
+            if ($tweak['group'] != $group) {
+                unset($tweaksGroup[$id]);
+            }
+        }
+
+        return $tweaksGroup;
+    }
+
+    /**
      * Adds Row Action
      *
      * @param Action\RowActionInterface $action
@@ -1006,13 +1198,14 @@ class Grid
     }
 
     /**
-     * Set default value for filters
+     * Set value for filters
      *
      * @param array Hash of columnName => initValue
+     * @param boolean permanent filters ?
      *
      * @return self
      */
-    public function setDefaultFilters(array $filters)
+    protected function setFilters(array $filters, $permanent = true)
     {
         foreach ($filters as $columnId => $ColumnValue) {
             if (is_array($ColumnValue)){
@@ -1025,10 +1218,39 @@ class Grid
                 $value['from'] = $value['from'] ? '1' : '0';
             }
 
-            $this->defaultFilters[$columnId] = $value;
+            if ($permanent) {
+                $this->permanentFilters[$columnId] = $value;
+            } else {
+                $this->defaultFilters[$columnId] = $value;
+            }
         }
 
         return $this;
+    }
+
+    /**
+     * Set permanent value for filters
+     *
+     * @param array Hash of columnName => initValue
+     * @param boolean fixed filters ?
+     *
+     * @return self
+     */
+    public function setPermanentFilters(array $filters)
+    {
+        return $this->setFilters($filters);
+    }
+
+    /**
+     * Set default value for filters
+     *
+     * @param array Hash of columnName => initValue
+     *
+     * @return self
+     */
+    public function setDefaultFilters(array $filters)
+    {
+        return $this->setFilters($filters, false);
     }
 
     /**
@@ -1319,9 +1541,8 @@ class Grid
      */
     public function isPagerSectionVisible()
     {
-        $limits = sizeof($this->getLimits());
-
-        return $limits > 1 || ($limits <= 1 && $this->getLimit() < $this->totalCount);
+        // true when totalCount rows exceed the minimum pager limit
+        return (min($this->getLimits()) <= $this->totalCount);
     }
 
     /**
