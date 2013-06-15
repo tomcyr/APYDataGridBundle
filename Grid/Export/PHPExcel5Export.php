@@ -26,9 +26,14 @@ class PHPExcel5Export extends Export
 
     public $objPHPExcel;
 
+    protected $prepareWriterCallback = null;
+
+    protected $preparePhpExcelCallback = null;
+
     public function __construct($tilte, $fileName = 'export', $params = array(), $charset = 'UTF-8')
     {
         $this->objPHPExcel =  new \PHPExcel();
+        $this->objPHPExcel->getProperties()->setTitle($tilte);
 
         parent::__construct($tilte, $fileName, $params, $charset);
     }
@@ -37,13 +42,16 @@ class PHPExcel5Export extends Export
     {
         $data = $this->getFlatGridData($grid);
 
-        $this->objPHPExcel->setActiveSheetIndex(0);
-
-        $row = 1;
+        $row = 0;
+        $activeSheet = $this->objPHPExcel->getActiveSheet();
         foreach ($data as $line) {
+            $row++;
             $column = 'A';
             foreach ($line as $cell) {
-                $this->objPHPExcel->getActiveSheet()->SetCellValue($column.$row, $cell);
+                $activeSheet->SetCellValue($column.$row, $cell);
+                if ($row == 1) {
+                    $activeSheet->getColumnDimension($column)->setAutoSize(true);
+                }
 
                 // 52 columns maximum
                 if ($column == 'Z') {
@@ -52,10 +60,13 @@ class PHPExcel5Export extends Export
                     $column++;
                 }
             }
-            $row++;
         }
 
+        $this->preparePhpExcel($row, $activeSheet->getHighestColumn());
+
         $objWriter = $this->getWriter();
+
+        $this->prepareWriter($objWriter, $row, $activeSheet->getHighestColumn());
 
         ob_start();
 
@@ -69,5 +80,39 @@ class PHPExcel5Export extends Export
     protected function getWriter()
     {
         return new \PHPExcel_Writer_Excel5($this->objPHPExcel);
+    }
+
+    /**
+     * @param \Closure $callback
+     */
+    public function manipulatePhpExcel(\Closure $callback = null)
+    {
+        $this->preparePhpExcelCallback = $callback;
+
+        return $this;
+    }
+
+    /**
+     * @param \Closure $callback
+     */
+    public function manipulateWriter(\Closure $callback = null)
+    {
+        $this->prepareWriterCallback = $callback;
+
+        return $this;
+    }
+
+    protected function preparePhpExcel($rowCount, $lastColumn)
+    {
+        if (is_callable($this->preparePhpExcelCallback)) {
+            call_user_func($this->preparePhpExcelCallback, $this->objPHPExcel, $rowCount, $lastColumn);
+        }
+    }
+
+    protected function prepareWriter(\PHPExcel_Writer_IWriter $writer, $rowCount, $lastColumn)
+    {
+        if (is_callable($this->prepareWriterCallback)) {
+            call_user_func($this->prepareWriterCallback, $writer, $rowCount, $lastColumn);
+        }
     }
 }

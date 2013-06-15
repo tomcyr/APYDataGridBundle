@@ -62,7 +62,11 @@ class DateTimeColumn extends Column
 
         $filters = array();
         foreach($parentFilters as $filter) {
-            $filters[] = ($filter->getValue() === null) ? $filter : $filter->setValue(new \DateTime($filter->getValue()));
+            if (! $filter->getValue() instanceof \DateTime) {
+                $filter->setValue(new \DateTime($filter->getValue()));
+            }
+
+            $filters[] = $filter;
         }
 
         return $filters;

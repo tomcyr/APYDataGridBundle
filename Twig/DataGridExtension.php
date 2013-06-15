@@ -106,6 +106,7 @@ class DataGridExtension extends \Twig_Extension
             'grid_html'         => new \Twig_Function_Method($this, 'getGridHtml', array('is_safe' => array('html'))),
             'grid_url'          => new \Twig_Function_Method($this, 'getGridUrl', array('is_safe' => array('html'))),
             'grid_filter'       => new \Twig_Function_Method($this, 'getGridFilter', array('is_safe' => array('html'))),
+            'grid_column_operator' => new \Twig_Function_Method($this, 'getGridColumnOperator', array('is_safe' => array('html'))),
             'grid_cell'         => new \Twig_Function_Method($this, 'getGridCell', array('is_safe' => array('html'))),
             'grid_search'       => new \Twig_Function_Method($this, 'getGridSearch', array('is_safe' => array('html'))),
             'grid_pager'        => new \Twig_Function_Method($this, 'getGridPager', array('is_safe' => array('html'))),
@@ -223,17 +224,30 @@ class DataGridExtension extends \Twig_Extension
 
         if (($id != '' && ($this->hasBlock($block = 'grid_'.$id.'_column_'.$column->getRenderBlockId().'_filter')
                         || $this->hasBlock($block = 'grid_'.$id.'_column_type_'.$column->getType().'_filter')
-                        || $this->hasBlock($block = 'grid_'.$id.'_column_filter_type_'.$column->getFilterType())
-                        || $this->hasBlock($block = 'grid_'.$id.'_column_type_'.$column->getParentType().'_filter')))
+                        || $this->hasBlock($block = 'grid_'.$id.'_column_type_'.$column->getParentType().'_filter'))
+                        || $this->hasBlock($block = 'grid_'.$id.'_column_filter_type_'.$column->getFilterType()))
          || $this->hasBlock($block = 'grid_column_'.$column->getRenderBlockId().'_filter')
          || $this->hasBlock($block = 'grid_column_type_'.$column->getType().'_filter')
-         || $this->hasBlock($block = 'grid_column_filter_type_'.$column->getFilterType())
-         || $this->hasBlock($block = 'grid_column_type_'.$column->getParentType().'_filter'))
+         || $this->hasBlock($block = 'grid_column_type_'.$column->getParentType().'_filter')
+         || $this->hasBlock($block = 'grid_column_filter_type_'.$column->getFilterType()))
         {
             return $this->renderBlock($block, array('grid' => $grid, 'column' => $column, 'submitOnChange' => $submitOnChange && $column->isFilterSubmitOnChange()));
         }
 
         return '';
+    }
+
+    /**
+     * Column Operator Drawing override
+     *
+     * @param \APY\DataGridBundle\Grid\Column\Column $column
+     * @param \APY\DataGridBundle\Grid\Grid $grid
+     *
+     * @return string
+     */
+    public function getGridColumnOperator($column, $grid, $operator, $submitOnChange = true)
+    {
+        return $this->renderBlock('grid_column_operator', array('grid' => $grid, 'column' => $column, 'submitOnChange' => $submitOnChange, 'op' => $operator));
     }
 
     /**
@@ -244,21 +258,21 @@ class DataGridExtension extends \Twig_Extension
      */
     public function getGridUrl($section, $grid, $param = null)
     {
-        $separator =  strpos($grid->getRouteUrl(), '?') ? '&' : '?';
+        $prefix = $grid->getRouteUrl().(strpos($grid->getRouteUrl(), '?') ? '&' : '?').$grid->getHash().'[';
 
         switch ($section) {
             case 'order':
                 if ($param->isSorted()) {
-                    return $grid->getRouteUrl().$separator.$grid->getHash().'['.Grid::REQUEST_QUERY_ORDER.']='.$param->getId().'|'.($param->getOrder() == 'asc' ? 'desc' : 'asc');
+                    return $prefix.Grid::REQUEST_QUERY_ORDER.']='.$param->getId().'|'.($param->getOrder() == 'asc' ? 'desc' : 'asc');
                 } else {
-                    return $grid->getRouteUrl().$separator.$grid->getHash().'['.Grid::REQUEST_QUERY_ORDER.']='.$param->getId().'|asc';
+                    return $prefix.Grid::REQUEST_QUERY_ORDER.']='.$param->getId().'|asc';
                 }
             case 'page':
-                return $grid->getRouteUrl().$separator.$grid->getHash().'['.Grid::REQUEST_QUERY_PAGE.']='.$param;
+                return $prefix.Grid::REQUEST_QUERY_PAGE.']='.$param;
             case 'limit':
-                return $grid->getRouteUrl().$separator.$grid->getHash().'['.Grid::REQUEST_QUERY_LIMIT.']=';
+                return $prefix.Grid::REQUEST_QUERY_LIMIT.']=';
             case 'reset':
-                return $grid->getRouteUrl().$separator.$grid->getHash().'['.Grid::REQUEST_QUERY_RESET.']=';
+                return $prefix.Grid::REQUEST_QUERY_RESET.']=';
         }
     }
 

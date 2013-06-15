@@ -17,6 +17,7 @@ use APY\DataGridBundle\Grid\Rows;
 use APY\DataGridBundle\Grid\Row;
 use APY\DataGridBundle\Grid\Helper\ORMCountWalker;
 use Doctrine\ORM\Query;
+use Symfony\Component\HttpKernel\Kernel;
 
 class Entity extends Source
 {
@@ -76,6 +77,11 @@ class Entity extends Source
      */
     protected $groupBy;
 
+    /**
+     * @var array
+     */
+    protected $hints;
+
     const TABLE_ALIAS = '_a';
     const COUNT_ALIAS = '__count';
 
@@ -89,11 +95,14 @@ class Entity extends Source
         $this->managerName = $managerName;
         $this->joins = array();
         $this->group = $group;
+        $this->hints = array();
     }
 
     public function initialise($container)
     {
-        $this->manager = $container->get('doctrine')->getEntityManager($this->managerName);
+        $doctrine = $container->get('doctrine');
+
+        $this->manager = version_compare(Kernel::VERSION, '2.1.0', '>=') ? $doctrine->getManager($this->managerName) : $doctrine->getEntityManager($this->managerName);
         $this->ormMetadata = $this->manager->getClassMetadata($this->entityName);
 
         $this->class = $this->ormMetadata->getReflectionClass()->name;
@@ -111,7 +120,7 @@ class Entity extends Source
      * @param \APY\DataGridBundle\Grid\Column\Column $column
      * @return string
      */
-    protected function getFieldName($column, $withAlias = false, $forHavingClause = false)
+    protected function getFieldName($column, $withAlias = false)
     {
         $name = $column->getField();
 
@@ -157,10 +166,6 @@ class Entity extends Source
                 $this->querySelectfromSource->addGroupBy($previousParent);
 
                 return "$functionWithParameters as $alias";
-            }
-
-            if ($forHavingClause) {
-                return $functionWithParameters;
             }
 
             return $alias;
@@ -279,7 +284,7 @@ class Entity extends Source
                 foreach ($filters as $filter) {
                     $operator = $this->normalizeOperator($filter->getOperator());
 
-                    $q = $this->query->expr()->$operator($this->getFieldName($column, false, $hasHavingClause), "?$bindIndex");
+                    $q = $this->query->expr()->$operator($this->getFieldName($column, false), "?$bindIndex");
 
                     if (in_array($filter->getOperator(), Column::$virtualNotOperators)) {
                         $q = $this->query->expr()->not($q);
@@ -299,7 +304,7 @@ class Entity extends Source
                 }
             }
 
-            // Encore utile ?
+            // Still useful?
             if ($column->getType() === 'array') {
                 $serializeColumns[] = $column->getId();
             }
@@ -340,8 +345,12 @@ class Entity extends Source
 
         //call overridden prepareQuery or associated closure
         $this->prepareQuery($this->query);
-        //error_log('#YPT ' . __METHOD__ . '[L.' . __LINE__ . '] $this->query->getDQL(): ' . var_export($this->query->getDQL(), true));
-        $items = $this->query->getQuery()->getResult();
+
+        $query = $this->query->getQuery();
+        foreach ($this->hints as $hintKey => $hintValue) {
+            $query->setHint($hintKey, $hintValue);
+        }
+        $items = $query->getResult();
 
         // hydrate result
         $result = new Rows();
@@ -502,6 +511,7 @@ class Entity extends Source
                             $values[$value] = $column->getDisplayedValue($value);
                             break;
                         default:
+
                             foreach ((array) $value as $val) {
                                 $values[$val] = $column->getDisplayedValue($val);
                             }
@@ -548,6 +558,25 @@ class Entity extends Source
     public function getHash()
     {
         return $this->entityName;
+    }
+
+    public function addHint($key, $value)
+    {
+        $this->hints[$key] = $value;
+    }
+
+    public function clearHints()
+    {
+        $this->hints = array();
+    }
+
+    /**
+     *  Set groupby column
+     *  @param string $groupBy GroupBy column
+     */
+    public function setGroupBy($groupBy)
+    {
+        $this->groupBy = $groupBy;
     }
 
     public function getQuery()

@@ -632,11 +632,21 @@ abstract class Column
         $operator = $this->data['operator'];
 
         if ($this->hasOperator($operator)) {
-            $valueFrom = (array) $this->data['from'];
+            $valueFrom = $this->data['from'];
+
+            // We can't simply cast a datetime into an array
+            if (!is_array($valueFrom)) {
+                $valueFrom = array($valueFrom);
+            }
+
             if ($this->isArrayColumn()) {
                 $filters = $this->getArrayFilters($operator, $valueFrom, $source);
             } else {
-                $valueTo = (array) $this->data['to'];
+                $valueTo = $this->data['to'];
+                if (!is_array($valueTo)) {
+                    $valueTo = array($valueTo);
+                }
+
                 $filters = $this->getBasicFilters($operator, $valueFrom, $valueTo, $source);
             }
 
@@ -684,7 +694,7 @@ abstract class Column
             case self::OPERATOR_ISNOTNULL:
                 $valueFrom = null;
             default:
-                foreach ((array) $valueFrom as $value) {
+                foreach ($valueFrom as $value) {
                     $filters[] =  new Filter($operator, $value);
                 }
                 break;

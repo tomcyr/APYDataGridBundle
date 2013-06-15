@@ -18,12 +18,12 @@ if ($grid->isReadyForRedirect() || $grid2->isReadyForRedirect() )
 	{
 		return $grid->getExportResponse();
 	}
-	
+
 	if ($grid2->isReadyForExport())
 	{
 		return $grid2->getExportResponse();
 	}
-	
+
 	// Url is the same for the grids
     return new RedirectResponse($grid->getRouteUrl());
 }
@@ -73,7 +73,7 @@ if ($gridManager->isReadyForRedirect())
 	{
 		return $gridManager->getExportResponse();
 	}
-	
+
     return new RedirectResponse($gridManager->getRouteUrl());
 }
 else

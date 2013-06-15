@@ -248,10 +248,17 @@ class Grid
 
     /**
      * Tweaks
-     * 
+     *
      * @var array
      */
     protected $tweaks = array();
+
+    /**
+     * Default Tweak
+     *
+     * @var string
+     */
+    protected $defaultTweak;
 
     // Lazy parameters
     protected $lazyAddColumn = array();
@@ -311,6 +318,11 @@ class Grid
         $this->source->getColumns($this->columns);
 
         return $this;
+    }
+
+    public function getSource()
+    {
+        return $this->source;
     }
 
     /**
@@ -419,7 +431,7 @@ class Grid
         $this->processMassActions($this->getFromRequest(self::REQUEST_QUERY_MASS_ACTION));
 
         if ($this->processExports($this->getFromRequest(Grid::REQUEST_QUERY_EXPORT))
-            || $this->processTweaks()) {
+            || $this->processTweaks($this->getFromRequest(self::REQUEST_QUERY_TWEAK))) {
             return;
         }
 
@@ -505,24 +517,34 @@ class Grid
     }
 
     /**
+     * Process tweaks
+     *
+     * @return boolean
      *
      * @throws \OutOfBoundsException
      */
-    protected function processTweaks()
+    protected function processTweaks($tweakId)
     {
-        $tweakId = $this->getFromRequest(self::REQUEST_QUERY_TWEAK);
-
-        if ($tweakId > -1) {
+        if ($tweakId != null) {
             if (array_key_exists($tweakId, $this->tweaks)) {
                 $tweak = $this->tweaks[$tweakId];
+                $saveAsActive = false;
+
+                if (isset($tweak['reset'])) {
+                    $this->sessionData = array();
+                    $this->session->remove($this->hash);
+                }
 
                 if (isset($tweak['filters'])) {
+                    $this->defaultFilters = array();
                     $this->setDefaultFilters($tweak['filters']);
                     $this->processDefaultFilters();
+                    $saveAsActive = true;
                 }
 
                 if (isset($tweak['order'])) {
                     $this->processOrder($tweak['order']);
+                    $saveAsActive = true;
                 }
 
                 if (isset($tweak['massAction'])) {
@@ -531,14 +553,60 @@ class Grid
 
                 if (isset($tweak['page'])) {
                     $this->processPage($tweak['page']);
+                    $saveAsActive = true;
                 }
 
                 if (isset($tweak['limit'])) {
                     $this->processLimit($tweak['limit']);
+                    $saveAsActive = true;
                 }
 
                 if (isset($tweak['export'])) {
                     $this->processExports($tweak['export']);
+                }
+
+                if ($saveAsActive) {
+                    $activeTweaks = $this->getActiveTweaks();
+                    $activeTweaks[$tweak['group']] = $tweakId;
+                    $this->set('tweaks', $activeTweaks);
+                }
+
+                if (isset($tweak['removeActiveTweaksGroups'])) {
+                    $removeActiveTweaksGroups = (array) $tweak['removeActiveTweaksGroups'];
+                    $activeTweaks = $this->getActiveTweaks();
+                    foreach ($removeActiveTweaksGroups as $id) {
+                        if (isset($activeTweaks[$id])) {
+                            unset($activeTweaks[$id]);
+                        }
+                    }
+
+                    $this->set('tweaks', $activeTweaks);
+                }
+
+                if (isset($tweak['removeActiveTweaks'])) {
+                    $removeActiveTweaks = (array) $tweak['removeActiveTweaks'];
+                    $activeTweaks = $this->getActiveTweaks();
+                    foreach ($removeActiveTweaks as $id) {
+                        if (array_key_exists($id, $this->tweaks)) {
+                            if (isset($activeTweaks[$this->tweaks[$id]['group']])) {
+                                unset($activeTweaks[$this->tweaks[$id]['group']]);
+                            }
+                        }
+                    }
+
+                    $this->set('tweaks', $activeTweaks);
+                }
+
+                if (isset($tweak['addActiveTweaks'])) {
+                    $addActiveTweaks = (array) $tweak['addActiveTweaks'];
+                    $activeTweaks = $this->getActiveTweaks();
+                    foreach ($addActiveTweaks as $id) {
+                        if (array_key_exists($id, $this->tweaks)) {
+                            $activeTweaks[$this->tweaks[$id]['group']] = $id;
+                        }
+                    }
+
+                    $this->set('tweaks', $activeTweaks);
                 }
 
                 $this->saveSession();
@@ -639,11 +707,16 @@ class Grid
                 if (isset($this->limits[$this->defaultLimit])) {
                     $this->set(self::REQUEST_QUERY_LIMIT, $this->defaultLimit);
                 } else {
-                    throw new \InvalidArgumentException($this->defaultLimit. ' is not a valid limit.');
+                    throw new \InvalidArgumentException(sprintf('Limit %s is not defined in limits.', $this->defaultLimit));
                 }
             } else {
                 throw new \InvalidArgumentException('Limit must be a positive number');
             }
+        }
+
+        // Default tweak
+        if ($this->defaultTweak !== null) {
+            $this->processTweaks($this->defaultTweak);
         }
 
         $this->saveSession();
@@ -661,6 +734,29 @@ class Grid
             if ($permanent) {
                 // Disable the filter capability for the column
                 $column->setFilterable(false);
+            }
+
+            // Convert simple value
+            if (is_array($value) && is_string(key($value))){
+                $value = $value;
+            } else {
+                $value = array('from' => $value);
+            }
+
+            // Convert boolean value
+            if (isset($value['from']) && is_bool($value['from'])) {
+                $value['from'] = $value['from'] ? '1' : '0';
+            }
+
+            // Convert simple value with select filter
+            if ($column->getFilterType() === 'select') {
+                if (isset($value['from']) && !is_array($value['from'])) {
+                    $value['from'] = array($value['from']);
+                }
+
+                if (isset($value['to']) && !is_array($value['to'])) {
+                    $value['to'] = array($value['to']);
+                }
             }
 
             // Store in the session
@@ -966,8 +1062,8 @@ class Grid
     /**
      * Add a tweak
      * @param string title title of the tweak
-     * @param array $tweak array('filters' => array, 'order' => 'colomunId|order', 'page' => integer, 'limit' => integer)Hash of columnName => initValue
-     * @param string id id of the tweak
+     * @param array $tweak array('filters' => array, 'order' => 'colomunId|order', 'page' => integer, 'limit' => integer, 'export' => integer, 'massAction' => integer)
+     * @param string id id of the tweak matching the regex ^[0-9a-zA-Z_\+-]+
      * @param string group group of the tweak
      *
      * @return self
@@ -1006,6 +1102,11 @@ class Grid
         return $this->tweaks;
     }
 
+    public function getActiveTweaks()
+    {
+        return (array) $this->get('tweaks');
+    }
+
     /**
      * Returns a tweak
      *
@@ -1037,6 +1138,12 @@ class Grid
         }
 
         return $tweaksGroup;
+    }
+
+    public function getActiveTweakGroup($group)
+    {
+        $tweaks = $this->getActiveTweaks();
+        return isset($tweaks[$group]) ? $tweaks[$group] : -1;
     }
 
     /**
@@ -1077,17 +1184,14 @@ class Grid
     public function setTemplate($template)
     {
         if ($template !== null) {
-            $storage = $this->session->get($this->getHash());
-
             if ($template instanceof \Twig_Template) {
                 $template = '__SELF__' . $template->getTemplateName();
             } elseif (!is_string($template) && $template === null) {
                 throw new \Exception('Unable to load template');
             }
 
-            $storage[self::REQUEST_QUERY_TEMPLATE] = $template;
-
-            $this->session->set($this->getHash(), $storage);
+            $this->set(self::REQUEST_QUERY_TEMPLATE, $template);
+            $this->saveSession();
         }
 
         return $this;
@@ -1134,7 +1238,7 @@ class Grid
      *
      * @return Export[]
      */
-    protected function getExportResponse()
+    public function getExportResponse()
     {
         return $this->exportResponse;
     }
@@ -1207,17 +1311,7 @@ class Grid
      */
     protected function setFilters(array $filters, $permanent = true)
     {
-        foreach ($filters as $columnId => $ColumnValue) {
-            if (is_array($ColumnValue)){
-                $value = $ColumnValue;
-            } else {
-                $value = array('from' => $ColumnValue);
-            }
-
-            if (isset($value['from']) && is_bool($value['from'])) {
-                $value['from'] = $value['from'] ? '1' : '0';
-            }
-
+        foreach ($filters as $columnId => $value) {
             if ($permanent) {
                 $this->permanentFilters[$columnId] = $value;
             } else {
@@ -1399,6 +1493,20 @@ class Grid
     public function setDefaultPage($page)
     {
         $this->defaultPage = (int) $page - 1;
+
+        return $this;
+    }
+
+    /**
+     * Sets default Tweak
+     *
+     * @param $tweakId
+     *
+     * @return self
+     */
+    public function setDefaultTweak($tweakId)
+    {
+        $this->defaultTweak = $tweakId;
 
         return $this;
     }
