@@ -73,6 +73,7 @@ abstract class Column
     protected $sortable;
     protected $filterable;
     protected $visible;
+    protected $export;
     protected $callback;
     protected $order;
     protected $size;
@@ -100,6 +101,7 @@ abstract class Column
     protected $safe;
     protected $separator;
     protected $dataJunction = null;
+    protected $joinType;
 
 
     /**
@@ -119,6 +121,7 @@ abstract class Column
         // Basic
         $this->setId($this->getParam('id'));
         $this->setField($this->getParam('field'));
+        $this->setJoinType($this->getParam('joinType'));
         $this->setVisibleForSource($this->getParam('source', false));
         $this->setPrimary($this->getParam('primary', false));
         $this->setTitle($this->getParam('title', ''));
@@ -132,6 +135,7 @@ abstract class Column
         $this->setSize($this->getParam('size', -1));
         $this->setInputType($this->getParam('inputType', 'text'));
         $this->setVisible($this->getParam('visible', true));
+        $this->setExport($this->getParam('export'));
 
         // Security
         $this->setRole($this->getParam('role'));
@@ -308,13 +312,15 @@ abstract class Column
      *
      * @return bool return true when column is visible
      */
-    public function isVisible()
+    public function isVisible($isExported = false)
     {
-        if ($this->visible && $this->securityContext !== null && $this->getRole() != null) {
+        $visible = $isExported && $this->export !== null ? $this->export : $this->visible;
+
+        if ($visible && $this->securityContext !== null && $this->getRole() != null) {
             return $this->securityContext->isGranted($this->getRole());
         }
 
-        return $this->visible;
+        return $visible;
     }
 
     /**
@@ -950,5 +956,29 @@ abstract class Column
     public function getSafe()
     {
         return $this->safe;
+    }
+
+    public function setExport($export)
+    {
+        $this->export = $export;
+
+        return $this;
+    }
+
+    public function getExport()
+    {
+        return $this->export;
+    }
+
+    public function setJoinType($joinType)
+    {
+        $this->joinType = $joinType;
+
+        return $this;
+    }
+
+    public function getJoinType()
+    {
+        return $this->joinType;
     }
 }
