@@ -15,8 +15,6 @@ Example:
 }
 ```
 
-Note: Filters aren't completely done.
-
 ## Add Country, Language and Locale column with their select filter.
 These new column are an extended TextColumn Class and the bundle detect the name of the property to add a specific instead of a TextColumn.
 (country, countries, language, languages, locale, locales)
