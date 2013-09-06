@@ -1,4 +1,3 @@
-
 What's new in 2.2 ?
 
 ### Each type of column manage automaticaly array values.
@@ -44,6 +43,7 @@ Example:
      */
     protected $my_var;
 }
+```
 
 ## Add new operators
 
