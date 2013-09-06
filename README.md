@@ -1,13 +1,3 @@
-A faire:
-
-Gérer isqueryvalid quand c'est un multi select ?
-Gérer le populate avec array values
-filter avec array values pour autre que text => serialize($fieldValue) ??
-
-Dans vector
-// @TODO search the type of each value in the array
-// @TODO manage country... columns
-
 
 What's new in 2.2 ?
 
@@ -64,3 +54,15 @@ Not between inclusive
 
 ## Add a way to set the data junction when you select multiple filters for a column
 Note: The checkbox isn't add yet.
+
+
+
+A faire:
+
+Gérer isqueryvalid quand c'est un multi select ?
+Gérer le populate avec array values
+filter avec array values pour autre que text => serialize($fieldValue) ??
+
+Dans vector
+// @TODO search the type of each value in the array
+// @TODO manage country... columns
