@@ -354,6 +354,18 @@ class Entity extends Source
         }
         $items = $query->getResult();
 
+        $repository = $this->manager->getRepository($this->entityName);
+
+        // Force the primary field to get the entity in the manipulatorRow
+        $primaryColumnId = null;
+        foreach ($columns as $column) {
+            if ($column->isPrimary()) {
+                $primaryColumnId = $column->getId();
+
+                break;
+            }
+        }
+
         // hydrate result
         $result = new Rows();
 
@@ -370,11 +382,18 @@ class Entity extends Source
                 $row->setField($key, $value);
             }
 
+            $row->setPrimaryField($primaryColumnId);
+
+            //Setting the representative repository for entity retrieving
+            $row->setRepository($repository);
+
             //call overridden prepareRow or associated closure
             if (($modifiedRow = $this->prepareRow($row)) != null) {
                 $result->addRow($modifiedRow);
             }
         }
+
+
 
         return $result;
     }

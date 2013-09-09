@@ -43,7 +43,7 @@ class ActionsColumn extends Column
                     if(($name = $action->getRouteParametersMapping($parameter)) === null) {
                         $name = $this->getValidRouteParameters($parameter);
                     }
-                    
+
                     $routeParameters[$name] = $row->getField($parameter);
                 } else {
                     $routeParameters[$this->getValidRouteParameters($name)] = $parameter;

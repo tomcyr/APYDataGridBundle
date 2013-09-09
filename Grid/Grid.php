@@ -195,6 +195,11 @@ class Grid
     protected $exportResponse;
 
     /**
+     * @var Response
+     */
+    protected $massActionResponse;
+
+    /**
      * @var int
      */
     protected $maxResults;
@@ -469,9 +474,20 @@ class Grid
                 }
 
                 if (is_callable($action->getCallback())) {
-                    call_user_func($action->getCallback(), array_keys($actionKeys), $actionAllKeys, $this->session, $action->getParameters());
+                    $this->massActionResponse = call_user_func($action->getCallback(), array_keys($actionKeys), $actionAllKeys, $this->session, $action->getParameters());
                 } elseif (strpos($action->getCallback(), ':') !== false) {
-                    $this->container->get('http_kernel')->forward($action->getCallback(), array_merge(array('primaryKeys' => array_keys($actionKeys), 'allPrimaryKeys' => $actionAllKeys), $action->getParameters()));
+                    $path = array_merge(
+                        array(
+                            'primaryKeys'    => array_keys($actionKeys),
+                            'allPrimaryKeys' => $actionAllKeys,
+                            '_controller'    => $action->getCallback()
+                        ),
+                        $action->getParameters()
+                    );
+
+                    $subRequest = $this->container->get('request')->duplicate(array(), null, $path);
+
+                    $this->massActionResponse = $this->container->get('http_kernel')->handle($subRequest, \Symfony\Component\HttpKernel\HttpKernelInterface::SUB_REQUEST);
                 } else {
                     throw new \RuntimeException(sprintf('Callback %s is not callable or Controller action', $action->getCallback()));
                 }
@@ -986,7 +1002,7 @@ class Grid
     {
         foreach ($this->lazyAddColumn as $column) {
             if ($column['column']->getId() == $columnId) {
-                return $column;
+                return $column['column'];
             }
         }
 
@@ -1244,6 +1260,16 @@ class Grid
     }
 
     /**
+     * Returns the mass action response
+     *
+     * @return Export[]
+     */
+    public function getMassActionResponse()
+    {
+        return $this->massActionResponse;
+    }
+
+    /**
      * Sets Route Parameters
      *
      * @param string $parameter
@@ -1299,6 +1325,11 @@ class Grid
     public function isReadyForExport()
     {
         return $this->isReadyForExport;
+    }
+
+    public function isMassActionRedirect()
+    {
+        return $this->massActionResponse instanceof Response;
     }
 
     /**
@@ -1888,6 +1919,10 @@ class Grid
 
         if ($this->isReadyForExport()) {
             return $this->getExportResponse();
+        }
+
+        if ($this->isMassActionRedirect()) {
+            return $this->getMassActionResponse();
         }
 
         if ($isReadyForRedirect) {
