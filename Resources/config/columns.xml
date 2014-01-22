@@ -15,7 +15,6 @@
         <parameter key="grid.column.country.class">APY\DataGridBundle\Grid\Column\CountryColumn</parameter>
         <parameter key="grid.column.language.class">APY\DataGridBundle\Grid\Column\LanguageColumn</parameter>
         <parameter key="grid.column.locale.class">APY\DataGridBundle\Grid\Column\LocaleColumn</parameter>
-        <parameter key="grid.column.year.class">APY\DataGridBundle\Grid\Column\YearColumn</parameter>
     </parameters>
 
     <services>
@@ -56,10 +55,6 @@
         </service>
 
         <service id="grid.column.locale" class="%grid.column.locale.class%" public="false">
-            <tag name="grid.column.extension" />
-        </service>
-        
-        <service id="grid.column.year" class="%grid.column.year.class%" public="false">
             <tag name="grid.column.extension" />
         </service>
 

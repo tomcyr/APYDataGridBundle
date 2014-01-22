@@ -53,7 +53,7 @@ class Category
 }
 ```
 
-**Important** Fields are automatically joined with a leftJoin. If you want to use an inner join, you can specify the join type:
+**Important** Fields are automitically joined with a leftJoin. If you want to use an inner join, you can specify the join type:
 
 ```php
 <?php
