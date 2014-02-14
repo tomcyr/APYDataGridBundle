@@ -443,9 +443,12 @@ class Grid
             return;
         }
 
-        $filtering = $this->processRequestFilters();
+        // Update filters if POSTing
+        if ($this->request->isMethod('POST')) {
+            $this->processRequestFilters();
+        }
 
-        $this->processPage($this->getFromRequest(self::REQUEST_QUERY_PAGE), $filtering);
+        $this->processPage($this->getFromRequest(self::REQUEST_QUERY_PAGE), $this->request->isMethod('POST'));
 
         $this->processOrder($this->getFromRequest(self::REQUEST_QUERY_ORDER));
 
@@ -646,25 +649,13 @@ class Grid
 
     protected function processRequestFilters()
     {
-        $filtering = false;
         foreach ($this->columns as $column) {
+            // Loop through filterable columns
             if ($column->isFilterable()) {
-                $ColumnId = $column->getId();
-
-                // Get data from request
-                $data = $this->getFromRequest($ColumnId);
-
-                // Store in the session
-                $this->set($ColumnId, $data);
-
-                // Filtering ?
-                if (!$filtering && $data !== null) {
-                    $filtering = true;
-                }
+                $columnId = $column->getId();
+                $this->sessionData[$columnId] = isset($this->requestData[$columnId]) ? $this->requestData[$columnId] : null;
             }
         }
-
-        return $filtering;
     }
 
     protected function processPage($page, $filtering = false)
