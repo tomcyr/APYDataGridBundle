@@ -21,6 +21,7 @@ use Doctrine\ODM\MongoDB\Query\Builder as QueryBuilder;
 
 class Document extends Source
 {
+
     /**
      * @var \Doctrine\ODM\MongoDB\Query\Builder;
      */
@@ -89,6 +90,7 @@ class Document extends Source
         $mapping = $container->get('grid.mapping.manager');
         $mapping->addDriver($this, -1);
         $this->metadata = $mapping->getMetadata($this->class, $this->group);
+        $this->cache = $container->get('snc_redis.doctrine');
     }
 
     /**
@@ -445,13 +447,18 @@ class Document extends Source
                 // Dynamic from query or not ?
                 $query = ($selectFrom === 'source') ? clone $queryFromSource : clone $queryFromQuery;
 
-                $result = $query->select($column->getField())
-                                ->distinct($column->getField())
-                                ->sort($column->getField(), 'asc')
-                                ->skip(null)
-                                ->limit(null)
-                                ->getQuery()
-                                ->execute();
+                $cache = $result = $this->getFilterCache($column->getField());
+                if ($cache === false) {
+                    $result = $query->select($column->getField())
+                                    ->distinct($column->getField())
+                                    ->sort($column->getField(), 'asc')
+                                    ->skip(null)
+                                    ->limit(null)
+                                    ->getQuery()
+                                    ->execute();
+
+                    $this->setFilterCache($column->getField(), $result);
+                }
 
                 $values = array();
                 foreach ($result as $value) {

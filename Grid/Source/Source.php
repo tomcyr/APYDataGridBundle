@@ -12,19 +12,23 @@
 
 namespace APY\DataGridBundle\Grid\Source;
 
-use APY\DataGridBundle\Grid\Mapping\Driver\DriverInterface;
-use Symfony\Component\Form\Exception\PropertyAccessDeniedException;
 use APY\DataGridBundle\Grid\Column;
-use APY\DataGridBundle\Grid\Rows;
+use APY\DataGridBundle\Grid\Mapping\Driver\DriverInterface;
 use APY\DataGridBundle\Grid\Row;
+use APY\DataGridBundle\Grid\Rows;
+use Symfony\Component\Form\Exception\PropertyAccessDeniedException;
 
 abstract class Source implements DriverInterface
 {
+    const CACHE_FILTER_KEY = 'gf:';
+    const CACHE_FILTER_TIME = 86400;
+
     protected $prepareQueryCallback = null;
     protected $prepareRowCallback = null;
     protected $data = null;
     protected $items = array();
     protected $count;
+    protected $cache;
 
     /**
      * @param \Doctrine\ODM\MongoDB\Query\Builder $queryBuilder
@@ -123,9 +127,9 @@ abstract class Source implements DriverInterface
     abstract public function populateSelectFilters($columns, $loop = false);
 
     /**
-    * Return source hash string
-    * @abstract
-    */
+     * Return source hash string
+     * @abstract
+     */
     abstract public function getHash();
 
     /**
@@ -194,7 +198,7 @@ abstract class Source implements DriverInterface
                         $elements = explode('.', $fieldName);
                         while ($element = array_shift($elements)) {
                             if (count($elements) > 0) {
-                                $itemEntity = call_user_func(array($itemEntity, 'get'.$element));
+                                $itemEntity = call_user_func(array($itemEntity, 'get' . $element));
                             } else {
                                 $functionName = ucfirst($element);
                             }
@@ -204,9 +208,9 @@ abstract class Source implements DriverInterface
                     // Get value of the column
                     if (isset($itemEntity->$fieldName)) {
                         $fieldValue = $itemEntity->$fieldName;
-                    } elseif (is_callable(array($itemEntity, $fullFunctionName = 'get'.$functionName))
-                           || is_callable(array($itemEntity, $fullFunctionName = 'has'.$functionName))
-                           || is_callable(array($itemEntity, $fullFunctionName = 'is'.$functionName))) {
+                    } elseif (is_callable(array($itemEntity, $fullFunctionName = 'get' . $functionName))
+                        || is_callable(array($itemEntity, $fullFunctionName = 'has' . $functionName))
+                        || is_callable(array($itemEntity, $fullFunctionName = 'is' . $functionName))) {
                         $fieldValue = call_user_func(array($itemEntity, $fullFunctionName));
                     } else {
                         throw new PropertyAccessDeniedException(sprintf('Property "%s" is not public or has no accessor.', $fieldName));
@@ -271,22 +275,22 @@ abstract class Source implements DriverInterface
                             $value = $this->prepareStringForLikeCompare($value);
                             switch ($operator) {
                                 case Column\Column::OPERATOR_EQ:
-                                    $value = '/^'.preg_quote($value, '/').'$/i';
+                                    $value = '/^' . preg_quote($value, '/') . '$/i';
                                     break;
                                 case Column\Column::OPERATOR_NEQ:
-                                    $value = '/^(?!'.preg_quote($value, '/').'$).*$/i';
+                                    $value = '/^(?!' . preg_quote($value, '/') . '$).*$/i';
                                     break;
                                 case Column\Column::OPERATOR_LIKE:
-                                    $value = '/'.preg_quote($value, '/').'/i';
+                                    $value = '/' . preg_quote($value, '/') . '/i';
                                     break;
                                 case Column\Column::OPERATOR_NLIKE:
-                                    $value = '/^((?!'.preg_quote($value, '/').').)*$/i';
+                                    $value = '/^((?!' . preg_quote($value, '/') . ').)*$/i';
                                     break;
                                 case Column\Column::OPERATOR_LLIKE:
-                                    $value = '/'.preg_quote($value, '/').'$/i';
+                                    $value = '/' . preg_quote($value, '/') . '$/i';
                                     break;
                                 case Column\Column::OPERATOR_RLIKE:
-                                    $value = '/^'.preg_quote($value, '/').'/i';
+                                    $value = '/^' . preg_quote($value, '/') . '/i';
                                     break;
                             }
                         }
@@ -295,12 +299,12 @@ abstract class Source implements DriverInterface
                         switch ($operator) {
                             case Column\Column::OPERATOR_EQ:
                                 if ($dataIsNumeric) {
-                                    $found = abs($fieldValue-$value) < 0.00001;
+                                    $found = abs($fieldValue - $value) < 0.00001;
                                     break;
                                 }
                             case Column\Column::OPERATOR_NEQ:
                                 if ($dataIsNumeric) {
-                                    $found = abs($fieldValue-$value) > 0.00001;
+                                    $found = abs($fieldValue - $value) > 0.00001;
                                     break;
                                 }
                             case Column\Column::OPERATOR_LIKE:
@@ -482,7 +486,7 @@ abstract class Source implements DriverInterface
                             }
 
                             // Mongodb bug ? timestamp value is on the key 'i' instead of the key 't'
-                            if (is_array($value) && array_keys($value) == array('t','i')) {
+                            if (is_array($value) && array_keys($value) == array('t', 'i')) {
                                 $value = $value['i'];
                             }
 
@@ -552,4 +556,37 @@ abstract class Source implements DriverInterface
 
         return preg_replace('#&([A-za-z]{2})(?:lig);#', '\1', $noaccentStr);
     }
+
+    protected function setFilterCache($field, $result)
+    {
+        if ($this->cache !== null) {
+            $cacheKey = self::CACHE_FILTER_KEY . $this->getHash() . '.' . $field;
+            $this->cache->set($cacheKey, json_encode($result), 'EX', self::CACHE_FILTER_TIME);
+        }
+
+        return;
+    }
+
+    protected function getFilterCache($field)
+    {
+        if ($this->cache !== null) {
+            $cacheKey = self::CACHE_FILTER_KEY . $this->getHash() . '.' . $field;
+            $data = $this->cache->get($cacheKey);
+
+            if ($data === null) {
+
+                return false;
+            }
+
+            $result = json_decode($data, true);
+            if ($result === null) {
+                $result = array();
+            }
+
+            return $result;
+        }
+
+        return false;
+    }
+
 }
