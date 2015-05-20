@@ -566,7 +566,7 @@ abstract class Source implements DriverInterface
 
         if ($this->cache !== null) {
             $cacheKey = self::CACHE_FILTER_KEY . $this->getHash() . '.' . $field;
-            $this->cache->set($cacheKey, json_encode($resultArr), 'EX', self::CACHE_FILTER_TIME);
+            $this->cache->setex($cacheKey, self::CACHE_FILTER_TIME, json_encode($resultArr));
         }
 
         return;
