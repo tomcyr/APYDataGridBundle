@@ -559,9 +559,14 @@ abstract class Source implements DriverInterface
 
     protected function setFilterCache($field, $result)
     {
+        $resultArr = array();
+        foreach ($result as $key => $value) {
+            $resultArr[$key] = $value;
+        }
+
         if ($this->cache !== null) {
             $cacheKey = self::CACHE_FILTER_KEY . $this->getHash() . '.' . $field;
-            $this->cache->set($cacheKey, json_encode($result), 'EX', self::CACHE_FILTER_TIME);
+            $this->cache->set($cacheKey, json_encode($resultArr), 'EX', self::CACHE_FILTER_TIME);
         }
 
         return;
