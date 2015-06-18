@@ -12,8 +12,8 @@
 
 namespace APY\DataGridBundle\Grid\Column;
 
-use Symfony\Component\Security\Core\SecurityContextInterface;
 use APY\DataGridBundle\Grid\Filter;
+use Symfony\Component\Security\Core\SecurityContextInterface;
 
 abstract class Column
 {
@@ -25,20 +25,20 @@ abstract class Column
     const DATA_CONJUNCTION = 0;
     const DATA_DISJUNCTION = 1;
 
-    const OPERATOR_EQ     = 'eq';
-    const OPERATOR_NEQ    = 'neq';
-    const OPERATOR_LT     = 'lt';
-    const OPERATOR_LTE    = 'lte';
-    const OPERATOR_GT     = 'gt';
-    const OPERATOR_GTE    = 'gte';
-    const OPERATOR_BTW    = 'btw';
-    const OPERATOR_BTWE   = 'btwe';
-    const OPERATOR_LIKE   = 'like';
-    const OPERATOR_NLIKE  = 'nlike';
-    const OPERATOR_RLIKE  = 'rlike';
-    const OPERATOR_LLIKE  = 'llike';
-    const OPERATOR_ISNULL  = 'isNull';
-    const OPERATOR_ISNOTNULL  = 'isNotNull';
+    const OPERATOR_EQ = 'eq';
+    const OPERATOR_NEQ = 'neq';
+    const OPERATOR_LT = 'lt';
+    const OPERATOR_LTE = 'lte';
+    const OPERATOR_GT = 'gt';
+    const OPERATOR_GTE = 'gte';
+    const OPERATOR_BTW = 'btw';
+    const OPERATOR_BTWE = 'btwe';
+    const OPERATOR_LIKE = 'like';
+    const OPERATOR_NLIKE = 'nlike';
+    const OPERATOR_RLIKE = 'rlike';
+    const OPERATOR_LLIKE = 'llike';
+    const OPERATOR_ISNULL = 'isNull';
+    const OPERATOR_ISNOTNULL = 'isNotNull';
 
     /**
      * Align
@@ -95,7 +95,6 @@ abstract class Column
 
     protected $dataJunction = self::DATA_CONJUNCTION;
 
-
     /**
      * Default Column constructor
      *
@@ -130,7 +129,7 @@ abstract class Column
         $this->setIsManualField($this->getParam('isManualField', false));
         $this->setIsAggregate($this->getParam('isAggregate', false));
         $this->setUsePrefixTitle($this->getParam('usePrefixTitle', true));
-        
+
         // Order is important for the order display
         $this->setOperators($this->getParam('operators', array(
             self::OPERATOR_EQ,
@@ -177,8 +176,8 @@ abstract class Column
             return call_user_func($this->callback, $value, $row, $router);
         }
 
-        $value = is_bool($value) ? (int)$value : $value;
-        if (array_key_exists((string)$value, $this->values)) {
+        $value = is_bool($value) ? (int) $value : $value;
+        if (array_key_exists((string) $value, $this->values)) {
             $value = $this->values[$value];
         }
 
@@ -255,7 +254,6 @@ abstract class Column
         return $this->title;
     }
 
-
     /**
      * Set column visibility
      *
@@ -319,9 +317,9 @@ abstract class Column
      */
     public function isFiltered()
     {
-        return ( (isset($this->data['from']) && $this->isQueryValid($this->data['from']) && $this->data['from'] != static::DEFAULT_VALUE)
-              || (isset($this->data['to']) && $this->isQueryValid($this->data['to']) && $this->data['to'] != static::DEFAULT_VALUE)
-              || (isset($this->data['operator']) && ($this->data['operator'] === self::OPERATOR_ISNULL || $this->data['operator'] === self::OPERATOR_ISNOTNULL)) );
+        return ((isset($this->data['from']) && $this->isQueryValid($this->data['from']) && $this->data['from'] != static::DEFAULT_VALUE)
+            || (isset($this->data['to']) && $this->isQueryValid($this->data['to']) && $this->data['to'] != static::DEFAULT_VALUE)
+            || (isset($this->data['operator']) && ($this->data['operator'] === self::OPERATOR_ISNULL || $this->data['operator'] === self::OPERATOR_ISNOTNULL)));
     }
 
     public function setFilterable($filterable)
@@ -415,7 +413,7 @@ abstract class Column
             $hasValue = true;
         }
 
-        $isNullOperator = (isset($data['operator']) && ($data['operator'] === self::OPERATOR_ISNULL || $data['operator'] === self::OPERATOR_ISNOTNULL) );
+        $isNullOperator = (isset($data['operator']) && ($data['operator'] === self::OPERATOR_ISNULL || $data['operator'] === self::OPERATOR_ISNOTNULL));
         if (($hasValue || $isNullOperator) && isset($data['operator']) && $this->hasOperator($data['operator'])) {
             $this->data['operator'] = $data['operator'];
         }
@@ -443,7 +441,7 @@ abstract class Column
             $hasValue = true;
         }
 
-        $isNullOperator = (isset($this->data['operator']) && ($this->data['operator'] === self::OPERATOR_ISNULL || $this->data['operator'] === self::OPERATOR_ISNOTNULL) );
+        $isNullOperator = (isset($this->data['operator']) && ($this->data['operator'] === self::OPERATOR_ISNULL || $this->data['operator'] === self::OPERATOR_ISNOTNULL));
         if ($hasValue || $isNullOperator) {
             $result['operator'] = $this->data['operator'];
         }
@@ -573,7 +571,7 @@ abstract class Column
     {
         $this->filterType = strtolower($filterType);
 
-        return  $this;
+        return $this;
     }
 
     public function getFilterType()
@@ -595,7 +593,7 @@ abstract class Column
                             $filters[] = new Filter(self::OPERATOR_GT, $this->data['from']);
                         }
                         if ($this->data['to'] != static::DEFAULT_VALUE) {
-                                $filters[] = new Filter(self::OPERATOR_LT, $this->data['to']);
+                            $filters[] = new Filter(self::OPERATOR_LT, $this->data['to']);
                         }
                         break;
                     case self::OPERATOR_BTWE:
@@ -880,7 +878,6 @@ abstract class Column
         return $this->class;
     }
 
-
     public function setIsManualField($isManualField)
     {
         $this->isManualField = $isManualField;
@@ -911,7 +908,5 @@ abstract class Column
         $this->usePrefixTitle = $usePrefixTitle;
         return $this;
     }
- 
-    
-    
+
 }

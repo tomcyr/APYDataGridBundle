@@ -73,6 +73,16 @@ class Document extends Source
     protected $referencedMappings = array();
 
     /**
+     * @var array
+     */
+    protected $embeddedMappings = array();
+
+    /**
+     * @var array
+     */
+    protected $embeddedColumns = array();
+
+    /**
      * @param string $documentName e.g. "Cms:Page"
      */
     public function __construct($documentName, $group = 'default')
@@ -195,6 +205,14 @@ class Document extends Source
                 continue;
             }
 
+            if (count($subColumn) > 1 && isset($this->embeddedMappings[$subColumn[0]])) {
+                $this->addEmbeddedColumnn($subColumn, $column);
+                // //must remove this embedded subColumn from processing
+                $columns->offsetUnset($columns->key());
+
+                continue;
+            }
+
             $this->query->select($column->getField());
 
             if ($column->isSorted()) {
@@ -210,6 +228,7 @@ class Document extends Source
                 foreach ($filters as $filter) {
                     //normalize values
                     $operator = $this->normalizeOperator($filter->getOperator());
+
                     $value = $this->normalizeValue($filter->getOperator(), $filter->getValue());
 
                     if ($column->getDataJunction() === Column::DATA_DISJUNCTION) {
@@ -257,6 +276,7 @@ class Document extends Source
             }
 
             $this->addReferencedFields($row, $resource);
+            $this->addEmbeddedFields($row, $resource);
 
             //call overridden prepareRow or associated closure
             if (($modifiedRow = $this->prepareRow($row)) != null) {
@@ -322,6 +342,57 @@ class Document extends Source
                         $row->setField($parent . '.' . $field, $node->$getter());
                     } else {
                         throw new \Exception(sprintf('Method %s for Document %s not exists', $getter, $this->referencedMappings[$parent]));
+                    }
+                }
+            }
+        }
+
+        return $row;
+    }
+
+    protected function addEmbeddedColumnn(array $subColumn, Column $column)
+    {
+        $this->embeddedColumns[$subColumn[0]][] = $subColumn[1];
+        if ($column->isFiltered()) {
+            $filters = $column->getFilters('document');
+            foreach ($filters as $filter) {
+                $operator = $this->normalizeOperator($filter->getOperator());
+                $this->query->field($subColumn[0] . '.' . $subColumn[1])->$operator($filter->getValue());
+            }
+        }
+    }
+
+    /**
+     * @param \APY\DataGridBundle\Grid\Row    $row
+     * @param Document $resource
+     * @throws \Exception if getter for field does not exists
+     * @return \APY\DataGridBundle\Grid\Row $row with referenced fields
+     */
+    protected function addEmbeddedFields(Row $row, $resource)
+    {
+        foreach ($this->embeddedColumns as $parent => $subColumns) {
+            $node = $this->getClassProperties($resource);
+            if (isset($node[strtolower($parent)])) {
+                $node = $node[strtolower($parent)];
+                $collectionGetter = 'get' . ucfirst($parent);
+                if (method_exists($resource, $collectionGetter)) {
+                    $collection = $resource->$collectionGetter();
+                    $array = [];
+                    foreach ($collection as $key => $embedded) {
+                        foreach ($subColumns as $field) {
+                            $getter = 'get' . ucfirst($field);
+                            if (method_exists($embedded, $getter)) {
+                                $value = $embedded->$getter();
+                                if (is_object($value) === false) {
+                                    $array[$field][] = $embedded->$getter();
+                                } elseif ($value instanceof \DatetIme) {
+                                    $array[$field][] = $embedded->$getter()->format('Y-m-d');
+                                }
+                            }
+                            if (isset($array[$field])) {
+                                $row->setField($parent . '.' . $field, $array[$field]);
+                            }
+                        }
                     }
                 }
             }
@@ -407,6 +478,9 @@ class Document extends Source
                     break;
                 case 'many':
                     $values['type'] = 'array';
+                    if (isset($mapping['embedded']) && $mapping['embedded'] === true) {
+                        $this->embeddedMappings[$name] = $mapping['targetDocument'];
+                    }
                     break;
                 default:
                     $values['type'] = 'text';
@@ -470,6 +544,7 @@ class Document extends Source
                         case 'datetime':
                         case 'date':
                         case 'time':
+                        case 'date_array':
                             if ($value instanceof \MongoDate || $value instanceof \MongoTimestamp) {
                                 $value = $value->sec;
                             }
@@ -494,6 +569,12 @@ class Document extends Source
                 } else {
                     $column->setValues($values);
                 }
+            } elseif ($column->getFilterType() === 'select' && $selectFrom === 'threat') {
+                $values = $this->manager->getRepository('ConceptItThreatDbAdminBundle:Threat')->getNamesForFilters();
+                $column->setValues($values);
+            } elseif ($column->getFilterType() === 'select' && $selectFrom === 'adminUser') {
+                $values = $this->manager->getRepository('ConceptItThreatDbAdminBundle:AdminUser')->getNamesForFilters();
+                $column->setValues($values);
             }
         }
     }
